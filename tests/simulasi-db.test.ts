@@ -6,7 +6,8 @@ const require = createRequire(import.meta.url)
 
 async function main() {
   const { Client } = require('pg')
-  const c = new Client({ connectionString: process.env.DATABASE_URL })
+  const { getDbConfig } = await import('../src/db/config.ts')
+  const c = new Client(getDbConfig())
   await c.connect()
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const persons = (
