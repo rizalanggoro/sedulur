@@ -35,7 +35,7 @@ function SearchBox({ nodes }: { nodes: PersonNodeType[] }) {
       <div className="relative">
         <Search
           size={14}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sea-ink-soft)]"
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
         />
         <input
           value={q}
@@ -44,17 +44,17 @@ function SearchBox({ nodes }: { nodes: PersonNodeType[] }) {
             if (e.key === 'Enter' && results[0]) focus(results[0].id)
           }}
           placeholder="Cari nama…"
-          className="w-full rounded-full border border-[var(--line)] bg-[var(--surface-strong)] py-2 pl-9 pr-3 text-sm text-[var(--sea-ink)] shadow backdrop-blur outline-none focus:ring-2 focus:ring-[var(--lagoon)]"
+          className="w-full rounded-full border border-border bg-card py-2 pl-9 pr-3 text-sm text-card-foreground shadow backdrop-blur outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
       {results.length > 0 && (
-        <div className="mt-1 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface-strong)] shadow-lg backdrop-blur">
+        <div className="mt-1 overflow-hidden rounded-xl border border-border bg-card shadow-lg backdrop-blur">
           {results.map((n) => (
             <button
               key={n.id}
               type="button"
               onClick={() => focus(n.id)}
-              className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-[var(--sea-ink)] transition hover:bg-[var(--sand)]"
+              className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-card-foreground transition hover:bg-secondary"
             >
               {n.data.person.fullName}
             </button>
@@ -74,8 +74,6 @@ function FlowInner({
 }) {
   const { fitView } = useReactFlow()
 
-  // fitView hanya saat komposisi keluarga berubah — bukan saat refetch
-  // menghasilkan array baru (mis. refetchOnWindowFocus), agar zoom tidak reset.
   const signature = nodes.map((n) => n.id).join(',')
   useEffect(() => {
     if (!signature) return
@@ -97,7 +95,7 @@ function FlowInner({
       deleteKeyCode={null}
       proOptions={{ hideAttribution: false }}
     >
-      <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="#b9d4c4" />
+      <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} />
       <Controls position="bottom-left" showInteractive={false} />
       <SearchBox nodes={nodes} />
     </ReactFlow>
@@ -111,20 +109,19 @@ export function FamilyCanvas({
   nodes: PersonNodeType[]
   edges: Parameters<typeof ReactFlow>[0]['edges']
 }) {
-  // React Flow hanya dirender di client agar aman terhadap SSR.
   const [ready, setReady] = useState(false)
   useEffect(() => setReady(true), [])
 
   if (!ready) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[var(--foam)] text-sm text-[var(--sea-ink-soft)]">
+      <div className="flex h-full w-full items-center justify-center bg-background text-sm text-muted-foreground">
         Memuat silsilah…
       </div>
     )
   }
 
   return (
-    <div className="h-full w-full overflow-hidden bg-[var(--foam)]">
+    <div className="h-full w-full overflow-hidden bg-background">
       <ReactFlowProvider>
         <FlowInner nodes={nodes} edges={edges} />
       </ReactFlowProvider>

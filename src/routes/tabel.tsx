@@ -61,7 +61,6 @@ function TabelPage() {
     }))
   })()
 
-  // Tambah anak: sertakan pasangan acuan sebagai orangtua kedua bila ada.
   const spouseIdOf = (person: Person) => {
     const ps = data?.partnerships.find(
       (x) => x.partnerAId === person.id || x.partnerBId === person.id,
@@ -70,45 +69,45 @@ function TabelPage() {
   }
 
   return (
-    <main className="page-wrap px-4 pb-16 pt-8">
-      <section className="island-shell rise-in mb-6 rounded-[2rem] px-6 py-8 sm:px-8">
-        <p className="island-kicker mb-2">Tabel Keluarga</p>
-        <h1 className="display-title mb-2 text-3xl font-bold text-[var(--sea-ink)] sm:text-4xl">
+    <main className="px-4 pb-16 pt-8 max-w-[1080px] mx-auto">
+      <section className="mb-6 rounded-2xl border border-border bg-card px-6 py-8 shadow-sm sm:px-8">
+        <p className="mb-2 text-xs text-muted-foreground uppercase tracking-wide">Tabel Keluarga</p>
+        <h1 className="mb-2 text-3xl font-bold text-card-foreground sm:text-4xl">
           Telusuri Per Relasi
         </h1>
-        <p className="m-0 max-w-2xl text-sm text-[var(--sea-ink-soft)]">
+        <p className="m-0 max-w-2xl text-sm text-muted-foreground">
           Masukkan nama sebagai titik acuan, lalu lihat orang tua, pasangan, dan
           anaknya dalam bentuk tabel. Klik nama lain untuk menjadikannya acuan baru.
         </p>
       </section>
 
       {isPending && (
-        <p className="text-center text-sm text-[var(--sea-ink-soft)]">Memuat data…</p>
+        <p className="text-center text-sm text-muted-foreground">Memuat data…</p>
       )}
       {isError && (
-        <p className="text-center text-sm text-red-700">Gagal memuat data silsilah.</p>
+        <p className="text-center text-sm text-destructive">Gagal memuat data silsilah.</p>
       )}
 
       {!isPending && !isError && !anchor && (
-        <section className="island-shell mx-auto max-w-xl rounded-2xl p-6">
-          <label htmlFor="cari-anchor" className="mb-2 block text-sm font-semibold text-[var(--sea-ink)]">
+        <section className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <label htmlFor="cari-anchor" className="mb-2 block text-sm font-semibold text-card-foreground">
             Nama acuan
           </label>
           <div className="relative">
             <Search
               size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sea-ink-soft)]"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
               id="cari-anchor"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="cth. Muh Sinun"
-              className="w-full rounded-full border border-[var(--line)] bg-white/70 py-2.5 pl-9 pr-3 text-sm text-[var(--sea-ink)] outline-none focus:ring-2 focus:ring-[var(--lagoon)]"
+              className="w-full rounded-full border border-border bg-background py-2.5 pl-9 pr-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           {results.length > 0 && (
-            <div className="mt-2 overflow-hidden rounded-xl border border-[var(--line)] bg-white/80">
+            <div className="mt-2 overflow-hidden rounded-xl border border-border bg-card">
               {results.map((p) => (
                 <button
                   key={p.id}
@@ -117,10 +116,10 @@ function TabelPage() {
                     setAnchorId(p.id)
                     setQ('')
                   }}
-                  className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm text-[var(--sea-ink)] transition hover:bg-[var(--sand)]"
+                  className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm text-card-foreground transition hover:bg-secondary"
                 >
                   {p.fullName}
-                  <span className="ml-2 text-xs text-[var(--sea-ink-soft)]">
+                  <span className="ml-2 text-xs text-muted-foreground">
                     {p.birthDate?.slice(0, 4) ?? '—'}
                   </span>
                 </button>
@@ -128,7 +127,7 @@ function TabelPage() {
             </div>
           )}
           {query && results.length === 0 && (
-            <p className="mt-2 text-sm text-[var(--sea-ink-soft)]">
+            <p className="mt-2 text-sm text-muted-foreground">
               Tidak ada nama yang cocok.
             </p>
           )}
@@ -136,15 +135,15 @@ function TabelPage() {
       )}
 
       {!isPending && !isError && anchor && (
-        <section className="island-shell rounded-2xl p-4 sm:p-6">
+        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--sand)] text-[var(--palm)]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
                 <Table2 size={18} />
               </div>
               <div>
-                <p className="island-kicker m-0 text-xs">Acuan saat ini</p>
-                <p className="m-0 text-base font-bold text-[var(--sea-ink)]">
+                <p className="m-0 text-xs text-muted-foreground uppercase tracking-wide">Acuan saat ini</p>
+                <p className="m-0 text-base font-bold text-card-foreground">
                   {anchor.fullName}
                 </p>
               </div>
@@ -200,14 +199,14 @@ function TabelPage() {
           </div>
 
           {rows.length === 0 ? (
-            <p className="m-0 py-8 text-center text-sm text-[var(--sea-ink-soft)]">
+            <p className="m-0 py-8 text-center text-sm text-muted-foreground">
               Belum ada relasi tercatat untuk {anchor.fullName}.
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="border-b border-[var(--line)] text-left text-xs uppercase tracking-wide text-[var(--sea-ink-soft)]">
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-3 py-2.5">Relasi</th>
                     <th className="px-3 py-2.5">Nama</th>
                     <th className="px-3 py-2.5">Tahun Lahir</th>
@@ -217,20 +216,20 @@ function TabelPage() {
                   {rows.map((r) => (
                     <tr
                       key={`${r.relasi}-${r.id}`}
-                      className="border-b border-[var(--line)] transition last:border-0 hover:bg-[var(--foam)]"
+                      className="border-b border-border transition last:border-0 hover:bg-secondary/50"
                     >
-                      <td className="px-3 py-2.5 font-medium text-[var(--palm)]">{r.relasi}</td>
+                      <td className="px-3 py-2.5 font-medium text-primary">{r.relasi}</td>
                       <td className="px-3 py-2.5">
                         <button
                           type="button"
                           title={`Jadikan ${r.nama} sebagai acuan`}
                           onClick={() => setAnchorId(r.id)}
-                          className="cursor-pointer font-semibold text-[var(--sea-ink)] underline decoration-[var(--lagoon)] decoration-2 underline-offset-4 transition hover:text-[var(--lagoon-deep)]"
+                          className="cursor-pointer font-semibold text-card-foreground underline underline-offset-4 decoration-primary decoration-2 transition hover:text-primary/80"
                         >
                           {r.nama}
                         </button>
                       </td>
-                      <td className="px-3 py-2.5 text-[var(--sea-ink-soft)]">{r.lahir}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{r.lahir}</td>
                     </tr>
                   ))}
                 </tbody>

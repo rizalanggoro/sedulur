@@ -17,7 +17,6 @@ export function FamilyPage() {
     queryFn: () => getFamily(),
   })
 
-  // Tombol "Tambah Anggota" di header (tampil saat silsilah masih kosong)
   useEffect(() => {
     const open = () => openDialog({ mode: 'create' })
     window.addEventListener('sedulur:tambah-anggota', open)
@@ -33,7 +32,6 @@ export function FamilyPage() {
     setDialogKey((k) => k + 1)
   }
 
-  // Stabil: dibuat sekali agar identitasnya aman dipakai di dalam node data.
   const dataRef = useRef(data)
   dataRef.current = data
   const handleNodeAction = useCallback<NodeActionHandler>((kind, person) => {
@@ -49,7 +47,6 @@ export function FamilyPage() {
       return
     }
     if (kind === 'child') {
-      // Sertakan pasangan pertama sebagai orangtua kedua bila ada.
       const partnership = d.partnerships.find(
         (ps) => ps.partnerAId === person.id || ps.partnerBId === person.id,
       )
@@ -80,13 +77,13 @@ export function FamilyPage() {
   return (
     <TreeShell>
       {isPending && (
-        <div className="flex h-full items-center justify-center text-sm text-[var(--sea-ink-soft)]">
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           Memuat silsilah…
         </div>
       )}
 
       {isError && (
-        <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-red-700">
+        <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-destructive">
           <p>Gagal memuat data silsilah.</p>
           <p className="m-0 text-xs opacity-70">{error.message}</p>
         </div>
@@ -94,14 +91,14 @@ export function FamilyPage() {
 
       {isEmpty && (
         <div className="flex h-full items-center justify-center p-6">
-          <div className="island-shell rise-in max-w-md rounded-[2rem] px-8 py-10 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--sand)] text-[var(--palm)]">
+          <div className="rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
               <Users size={26} />
             </div>
-            <h2 className="mb-2 text-xl font-bold text-[var(--sea-ink)]">
+            <h2 className="mb-2 text-xl font-bold text-card-foreground">
               Mulai Silsilah Keluarga Anda
             </h2>
-            <p className="mb-6 text-sm text-[var(--sea-ink-soft)]">
+            <p className="mb-6 text-sm text-muted-foreground">
               Belum ada anggota keluarga. Tambahkan anggota pertama untuk mulai
               membangun silsilah.
             </p>
@@ -190,8 +187,6 @@ function DetailPanel({
   const lahir = formatTanggal(person.birthDate)
   const wafat = formatTanggal(person.deathDate)
 
-  // Anak lahir sebelum orangtuanya menikah? Tawarkan menautkan pasangan
-  // orangtua tersebut sebagai orangtua kedua.
   const myLinks = family.parentLinks.filter((l) => l.childId === person.id)
   let missingParent: Person | null = null
   if (onLinkParent && myLinks.length === 1) {
@@ -208,29 +203,29 @@ function DetailPanel({
   }
 
   return (
-    <aside className="absolute right-4 top-4 z-20 max-h-[calc(100%-2rem)] w-80 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-5 shadow-xl backdrop-blur">
+    <aside className="absolute right-4 top-4 z-20 max-h-[calc(100%-2rem)] w-80 overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-xl backdrop-blur">
       <div className="mb-4 flex items-start justify-between gap-2">
         <div className="flex items-center gap-3">
           {person.photoUrl ? (
             <img
               src={person.photoUrl}
               alt={person.fullName}
-              className="h-14 w-14 rounded-full border border-[var(--line)] object-cover"
+              className="h-14 w-14 rounded-full border border-border object-cover"
             />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--sand)] text-base font-bold text-[var(--palm)]">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-base font-bold text-secondary-foreground">
               {person.fullName.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')}
             </div>
           )}
           <div>
-            <h3 className="m-0 text-base font-bold leading-tight text-[var(--sea-ink)]">
+            <h3 className="m-0 text-base font-bold leading-tight text-card-foreground">
               {person.fullName}
             </h3>
-            <p className="m-0 text-xs text-[var(--sea-ink-soft)]">
+            <p className="m-0 text-xs text-muted-foreground">
               {person.gender === 'L' ? 'Laki-laki' : person.gender === 'P' ? 'Perempuan' : '—'}
             </p>
             {order && (
-              <p className="m-0 text-xs font-medium text-[var(--palm)]">
+              <p className="m-0 text-xs font-medium text-primary">
                 Anak ke-{order.rank} dari {order.total} bersaudara
               </p>
             )}
@@ -240,7 +235,7 @@ function DetailPanel({
           type="button"
           aria-label="Tutup"
           onClick={onClose}
-          className="rounded-full p-1.5 text-[var(--sea-ink-soft)] transition hover:bg-[var(--sand)] hover:text-[var(--sea-ink)]"
+          className="rounded-full p-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
         >
           <X size={16} />
         </button>
@@ -249,24 +244,24 @@ function DetailPanel({
       <dl className="m-0 grid gap-1 text-sm">
         {lahir && (
           <div className="flex gap-2">
-            <dt className="w-16 flex-shrink-0 text-[var(--sea-ink-soft)]">Lahir</dt>
-            <dd className="m-0 font-medium text-[var(--sea-ink)]">{lahir}</dd>
+            <dt className="w-16 flex-shrink-0 text-muted-foreground">Lahir</dt>
+            <dd className="m-0 font-medium text-card-foreground">{lahir}</dd>
           </div>
         )}
         {wafat && (
           <div className="flex gap-2">
-            <dt className="w-16 flex-shrink-0 text-[var(--sea-ink-soft)]">Wafat</dt>
-            <dd className="m-0 font-medium text-[var(--sea-ink)]">{wafat}</dd>
+            <dt className="w-16 flex-shrink-0 text-muted-foreground">Wafat</dt>
+            <dd className="m-0 font-medium text-card-foreground">{wafat}</dd>
           </div>
         )}
       </dl>
 
       {(ortu.length > 0 || pasangan.length > 0 || anak.length > 0) && (
-        <div className="mt-4 grid gap-2 border-t border-[var(--line)] pt-4 text-sm">
+        <div className="mt-4 grid gap-2 border-t border-border pt-4 text-sm">
           {ortu.length > 0 && (
             <div>
-              <p className="island-kicker m-0 mb-1 text-xs">Orangtua</p>
-              <ul className="m-0 list-none space-y-0.5 p-0 text-[var(--sea-ink)]">
+              <p className="m-0 mb-1 text-xs text-muted-foreground uppercase tracking-wide">Orangtua</p>
+              <ul className="m-0 list-none space-y-0.5 p-0 text-card-foreground">
                 {ortu.map((l) => (
                   <li key={l.id}>{nama(l.parentId)}</li>
                 ))}
@@ -275,12 +270,12 @@ function DetailPanel({
           )}
           {pasangan.length > 0 && (
             <div>
-              <p className="island-kicker m-0 mb-1 text-xs">Pasangan</p>
-              <ul className="m-0 list-none space-y-0.5 p-0 text-[var(--sea-ink)]">
+              <p className="m-0 mb-1 text-xs text-muted-foreground uppercase tracking-wide">Pasangan</p>
+              <ul className="m-0 list-none space-y-0.5 p-0 text-card-foreground">
                 {pasangan.map((ps, i) => (
                   <li key={i}>
                     {nama(ps.orang)}
-                    <span className="text-xs text-[var(--sea-ink-soft)]">
+                    <span className="text-xs text-muted-foreground">
                       {' '}
                       ({ps.status === 'cerai' ? 'cerai' : 'menikah'})
                     </span>
@@ -291,8 +286,8 @@ function DetailPanel({
           )}
           {anak.length > 0 && (
             <div>
-              <p className="island-kicker m-0 mb-1 text-xs">Anak</p>
-              <ul className="m-0 list-none space-y-0.5 p-0 text-[var(--sea-ink)]">
+              <p className="m-0 mb-1 text-xs text-muted-foreground uppercase tracking-wide">Anak</p>
+              <ul className="m-0 list-none space-y-0.5 p-0 text-card-foreground">
                 {anak.map((l) => (
                   <li key={l.id}>{nama(l.childId)}</li>
                 ))}
@@ -303,14 +298,15 @@ function DetailPanel({
       )}
 
       {missingParent && (
-        <div className="mt-4 rounded-xl border border-[var(--chip-line)] bg-[var(--sand)] p-3 text-sm">
-          <p className="m-0 text-[var(--sea-ink)]">
+        <div className="mt-4 rounded-xl border border-border bg-secondary p-3 text-sm">
+          <p className="m-0 text-card-foreground">
             Saat ini hanya tertaut ke <b>{nama(myLinks[0].parentId)}</b>.
           </p>
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2 w-full"
             disabled={linkPending}
-            className="mt-2 w-full cursor-pointer rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--palm)] transition hover:bg-[var(--foam)] disabled:opacity-50"
             onClick={async () => {
               setLinkPending(true)
               try {
@@ -323,12 +319,12 @@ function DetailPanel({
             {linkPending
               ? 'Menautkan…'
               : `Tautkan ${missingParent.fullName} sebagai orangtua juga`}
-          </button>
+          </Button>
         </div>
       )}
 
       {person.notes && (
-        <p className="mb-0 mt-4 whitespace-pre-wrap rounded-xl bg-[var(--foam)] p-3 text-sm leading-relaxed text-[var(--sea-ink-soft)]">
+        <p className="mb-0 mt-4 whitespace-pre-wrap rounded-xl bg-secondary p-3 text-sm leading-relaxed text-muted-foreground">
           {person.notes}
         </p>
       )}
@@ -344,7 +340,6 @@ function DetailPanel({
   )
 }
 
-/** Kontainer kanvas memenuhi seluruh layar di bawah header. */
 function TreeShell({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
 

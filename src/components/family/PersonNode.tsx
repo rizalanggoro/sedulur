@@ -20,8 +20,8 @@ function initials(name: string) {
 function years(person: PersonNode['data']['person']) {
   const birth = person.birthDate?.slice(0, 4)
   const death = person.deathDate?.slice(0, 4)
-  if (birth && death) return `${birth} – ${death}` // sudah wafat
-  return birth ?? (death ? `wafat ${death}` : null) // masih hidup: tahun lahir saja
+  if (birth && death) return `${birth} – ${death}`
+  return birth ?? (death ? `wafat ${death}` : null)
 }
 
 function spouseBadgeLabel(p: PersonNode['data']['person']) {
@@ -45,16 +45,16 @@ export function PersonNode({ data, selected }: NodeProps<PersonNode>) {
       {data.birthOrder && (
         <div
           title={`Anak ke-${data.birthOrder.rank} dari ${data.birthOrder.total} bersaudara`}
-          className="absolute -right-2 -top-2 z-[1] flex h-6 w-6 items-center justify-center rounded-full bg-[var(--palm)] text-[11px] font-bold text-white shadow"
+          className="absolute -right-2 -top-2 z-[1] flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground shadow"
         >
           {data.birthOrder.rank}
         </div>
       )}
       <div
-        className={`flex h-full w-full cursor-pointer items-center gap-3 rounded-2xl border bg-[var(--surface-strong)] px-3 shadow-sm backdrop-blur transition ${
+        className={`flex h-full w-full cursor-pointer items-center gap-3 rounded-2xl border bg-card px-3 shadow-sm backdrop-blur transition ${
           selected
-            ? 'border-[var(--lagoon-deep)] ring-2 ring-[var(--lagoon)]'
-            : 'border-[var(--line)]'
+            ? 'border-primary ring-2 ring-primary/30'
+            : 'border-border'
         }`}
         style={{
           borderLeftColor: genderAccent[person.gender] ?? genderAccent['-'],
@@ -66,24 +66,23 @@ export function PersonNode({ data, selected }: NodeProps<PersonNode>) {
           <img
             src={person.photoUrl}
             alt={person.fullName}
-            className="h-12 w-12 flex-shrink-0 rounded-full border border-[var(--line)] object-cover"
+            className="h-12 w-12 flex-shrink-0 rounded-full border border-border object-cover"
           />
         ) : (
-          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[var(--sand)] text-sm font-bold text-[var(--palm)]">
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold text-secondary-foreground">
             {initials(person.fullName)}
           </div>
         )}
         <div className="min-w-0">
-          <p className="m-0 truncate text-sm font-bold text-[var(--sea-ink)]">
+          <p className="m-0 truncate text-sm font-bold text-card-foreground">
             {person.fullName}
           </p>
-          <p className="m-0 text-xs text-[var(--sea-ink-soft)]">{lifeYears ?? '—'}</p>
+          <p className="m-0 text-xs text-muted-foreground">{lifeYears ?? '—'}</p>
         </div>
       </div>
 
-      {/* Aksi cepat konteks node (tampil saat hover / terpilih) */}
       <div
-        className={`absolute -bottom-10 left-1/2 z-10 flex -translate-x-1/2 gap-1 whitespace-nowrap rounded-full border border-[var(--line)] bg-[var(--surface-strong)] px-1.5 py-1 shadow-lg backdrop-blur transition-opacity ${
+        className={`absolute -bottom-10 left-1/2 z-10 flex -translate-x-1/2 gap-1 whitespace-nowrap rounded-full border border-border bg-card px-1.5 py-1 shadow-lg backdrop-blur transition-opacity ${
           selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}
       >
@@ -123,7 +122,7 @@ function NodeActionButton({
       type="button"
       title={label}
       aria-label={label}
-      className="nodrag nopan flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-[var(--sea-ink)] transition hover:bg-[var(--sand)] hover:text-[var(--palm)]"
+      className="nodrag nopan flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-foreground transition hover:bg-secondary hover:text-primary"
       onClick={(e) => {
         e.stopPropagation()
         onClick()
