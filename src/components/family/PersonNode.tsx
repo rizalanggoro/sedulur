@@ -20,8 +20,8 @@ function initials(name: string) {
 function years(person: PersonNode['data']['person']) {
   const birth = person.birthDate?.slice(0, 4)
   const death = person.deathDate?.slice(0, 4)
-  if (!birth && !death) return null
-  return `${birth ?? '?'} – ${death ?? '?'}`
+  if (birth && death) return `${birth} – ${death}` // sudah wafat
+  return birth ?? (death ? `wafat ${death}` : null) // masih hidup: tahun lahir saja
 }
 
 export function PersonNode({ data, selected }: NodeProps<PersonNode>) {
