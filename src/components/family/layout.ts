@@ -17,8 +17,44 @@ export type NodeActionHandler = (
   person: Person,
 ) => void
 
+/** Urutan kelahiran di antara saudara sekandang. */
+export type BirthOrder = { rank: number; total: number }
+
+/** Kelompokkan saudara sekandang, terurut tanggal lahir (fallback: urutan data). */
+export function groupSiblings(
+  parentsByChild: Map<string, string[]>,
+  byId: Map<string, Person>,
+): { id: string; key: string }[][] {
+  const groups = new Map<string, { id: string; key: string }[]>()
+  for (const [childId, parents] of parentsByChild) {
+    const person = byId.get(childId)
+    if (!person) continue
+    const gk = [...parents].sort().join('|')
+    const created =
+      person.createdAt instanceof Date ? person.createdAt.toISOString().slice(0, 10) : ''
+    const key = person.birthDate ?? (created || '9999')
+    ;(groups.get(gk) ?? groups.set(gk, []).get(gk)!).push({ id: childId, key })
+  }
+  return [...groups.values()]
+    .map((list) => [...list].sort((a, b) => a.key.localeCompare(b.key)))
+    .filter((list) => list.length >= 2)
+}
+
+/** Hitung "anak ke-N" per kelompok saudara sekandang (set orangtua identik). */
+export function computeBirthOrders(
+  parentsByChild: Map<string, string[]>,
+  byId: Map<string, Person>,
+): Map<string, BirthOrder> {
+  const orders = new Map<string, BirthOrder>()
+  for (const list of groupSiblings(parentsByChild, byId)) {
+    list.forEach((item, i) => orders.set(item.id, { rank: i + 1, total: list.length }))
+  }
+  return orders
+}
+
 export type PersonFlowData = {
   person: Person
+  birthOrder?: BirthOrder
   onAction?: NodeActionHandler
 }
 export type ChildEdgeData = { anchorIds: string[] }
@@ -115,24 +151,51 @@ export function layoutFamily(
   }
   Dagre.layout(g)
 
+  const byIndex = new Map(persons.map((p) => [p.id, p]))
+  const parentsByChild = new Map<string, string[]>()
+  for (const link of parentLinks) {
+    ;(parentsByChild.get(link.childId) ??
+      parentsByChild.set(link.childId, []).get(link.childId)!).push(link.parentId)
+  }
+
+  // Posisi unit dari dagre (top-left)
+  const unitBox = new Map<string, { x: number; y: number }>()
+  for (const [root] of orderedUnits) {
+    const n = g.node(root)
+    unitBox.set(root, { x: n.x - n.width / 2, y: n.y - CARD_H / 2 })
+  }
+
+  // Anak ke-N menentukan urutan kiri→kanan: tukar slot-x di dalam grup saudara.
+  // Hanya memutar posisi antar anggota grup, jadi tidak mungkin bertumpuk.
+  for (const grp of groupSiblings(parentsByChild, byIndex)) {
+    const childUnits = grp.map((m) => ({ key: m.key, root: find(m.id) }))
+    if (new Set(childUnits.map((c) => c.root)).size !== childUnits.length) continue
+    const slots = childUnits
+      .map((c) => unitBox.get(c.root)!.x)
+      .sort((a, b) => a - b)
+    ;[...childUnits]
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .forEach((cu, i) => {
+        unitBox.get(cu.root)!.x = slots[i]
+      })
+  }
+
   // Posisi person di dalam unit-nya
   const posById = new Map<string, { x: number; y: number }>()
   for (const [root, members] of orderedUnits) {
-    const unit = g.node(root)
-    let x = unit.x - unit.width / 2
-    const y = unit.y - CARD_H / 2
+    const box = unitBox.get(root)!
+    let x = box.x
     for (const id of members) {
-      posById.set(id, { x, y })
+      posById.set(id, { x, y: box.y })
       x += CARD_W + SPOUSE_GAP
     }
   }
-
-  const byIndex = new Map(persons.map((p) => [p.id, p]))
+  const orders = computeBirthOrders(parentsByChild, byIndex)
   const nodes: PersonNode[] = persons.map((p) => ({
     id: p.id,
     type: 'person',
     position: posById.get(p.id)!,
-    data: { person: p, onAction },
+    data: { person: p, birthOrder: orders.get(p.id), onAction },
   }))
 
   const edges: Edge[] = []
@@ -161,11 +224,6 @@ export function layoutFamily(
   }
 
   // Garis ke anak: satu garis dari titik tengah para orangtua
-  const parentsByChild = new Map<string, string[]>()
-  for (const link of parentLinks) {
-    ;(parentsByChild.get(link.childId) ??
-      parentsByChild.set(link.childId, []).get(link.childId)!).push(link.parentId)
-  }
   for (const [childId, parents] of parentsByChild) {
     if (!byIndex.has(childId)) continue
     const source = parents.find((p) => posById.has(p))

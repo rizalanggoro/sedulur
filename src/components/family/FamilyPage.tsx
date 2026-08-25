@@ -4,7 +4,7 @@ import { Pencil, Plus, Users, X } from 'lucide-react'
 
 import { getFamily } from '#/lib/family'
 import type { ParentLink, Partnership, Person } from '#/db/schema'
-import { layoutFamily } from './layout'
+import { layoutFamily, computeBirthOrders } from './layout'
 import type { NodeActionHandler } from './layout'
 import { FamilyCanvas } from './FamilyCanvas'
 import { PersonDialog, type PersonDialogState } from './PersonDialog'
@@ -161,6 +161,14 @@ function DetailPanel({
 }) {
   if (!person || !family) return null
 
+  const byId = new Map(family.persons.map((p) => [p.id, p]))
+  const parentsByChild = new Map<string, string[]>()
+  for (const l of family.parentLinks) {
+    ;(parentsByChild.get(l.childId) ?? parentsByChild.set(l.childId, []).get(l.childId)!).push(
+      l.parentId,
+    )
+  }
+  const order = computeBirthOrders(parentsByChild, byId).get(person.id)
   const nama = (id: string) => family.persons.find((p) => p.id === id)?.fullName ?? '—'
   const ortu = family.parentLinks.filter((l) => l.childId === person.id)
   const anak = family.parentLinks.filter((l) => l.parentId === person.id)
@@ -196,6 +204,11 @@ function DetailPanel({
             <p className="m-0 text-xs text-[var(--sea-ink-soft)]">
               {person.gender === 'L' ? 'Laki-laki' : person.gender === 'P' ? 'Perempuan' : '—'}
             </p>
+            {order && (
+              <p className="m-0 text-xs font-medium text-[var(--palm)]">
+                Anak ke-{order.rank} dari {order.total} bersaudara
+              </p>
+            )}
           </div>
         </div>
         <button

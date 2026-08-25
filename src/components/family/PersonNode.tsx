@@ -30,6 +30,14 @@ export function PersonNode({ data, selected }: NodeProps<PersonNode>) {
 
   return (
     <div className="group relative" style={{ width: 224, height: 96 }}>
+      {data.birthOrder && (
+        <div
+          title={`Anak ke-${data.birthOrder.rank} dari ${data.birthOrder.total} bersaudara`}
+          className="absolute -right-2 -top-2 z-[1] flex h-6 w-6 items-center justify-center rounded-full bg-[var(--palm)] text-[11px] font-bold text-white shadow"
+        >
+          {data.birthOrder.rank}
+        </div>
+      )}
       <div
         className={`flex h-full w-full cursor-pointer items-center gap-3 rounded-2xl border bg-[var(--surface-strong)] px-3 shadow-sm backdrop-blur transition ${
           selected

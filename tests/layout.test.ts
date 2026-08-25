@@ -73,6 +73,15 @@ const pcG = edges.find((e) => e.id === 'pc:G') as Edge & {
 }
 assert.deepEqual(pcG.data.anchorIds, ['D'], 'G dari orangtua tunggal')
 
+// Urutan saudara: C (1965) anak ke-1, D (1968) anak ke-2 dari pasangan A+B
+const nodeC = nodes.find((n) => n.id === 'C')!
+const nodeD = nodes.find((n) => n.id === 'D')!
+assert.deepEqual(nodeC.data.birthOrder, { rank: 1, total: 2 }, 'C anak pertama')
+assert.deepEqual(nodeD.data.birthOrder, { rank: 2, total: 2 }, 'D anak kedua')
+assert.ok(pos.C.x < pos.D.x, 'anak ke-1 di kiri anak ke-2')
+// F satu-satunya anak dari C+E → tanpa nomor
+assert.equal(nodes.find((n) => n.id === 'F')!.data.birthOrder, undefined)
+
 // Kosong aman
 assert.deepEqual(layoutFamily({ persons: [], parentLinks: [], partnerships: [] }), {
   nodes: [],
