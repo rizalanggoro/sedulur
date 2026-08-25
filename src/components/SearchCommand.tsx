@@ -73,7 +73,7 @@ export function SearchCommand() {
             </Link>
           </CommandItem>
           <CommandItem asChild>
-            <Link to="/tabel">
+            <Link to="/tabel" search={{ id: undefined }}>
               <Table2 className="size-4" />
               <span>Tabel</span>
               <CommandShortcut>⌘2</CommandShortcut>

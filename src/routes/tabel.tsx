@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Baby, Heart, Plus, Search, Table2, ArrowUp } from 'lucide-react'
+import { Baby, Eye, Heart, Search, Table2, ArrowUp } from 'lucide-react'
 
 import { getFamily } from '#/lib/family'
 import { Button } from '#/components/ui/button'
@@ -9,19 +9,34 @@ import {
   PersonDialog,
   type PersonDialogState,
 } from '#/components/family/PersonDialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '#/components/ui/dialog'
 import type { Person } from '#/db/schema'
 
-export const Route = createFileRoute('/tabel')({ component: TabelPage })
+function validateSearch(search: Record<string, unknown>) {
+  return { id: (search.id as string) || undefined }
+}
+
+export const Route = createFileRoute('/tabel')({
+  validateSearch,
+  component: TabelPage,
+})
 
 function TabelPage() {
   const { data, isPending, isError } = useQuery({
     queryKey: ['family'],
     queryFn: () => getFamily(),
   })
-  const [anchorId, setAnchorId] = useState<string | null>(null)
+  const { id: anchorId } = Route.useSearch()
+  const navigate = Route.useNavigate()
   const [q, setQ] = useState('')
   const [dialog, setDialog] = useState<PersonDialogState>(null)
   const [dialogKey, setDialogKey] = useState(0)
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   const openDialog = (next: PersonDialogState) => {
     setDialog(next)
@@ -36,6 +51,10 @@ function TabelPage() {
         .slice(0, 7)
     : []
   const anchor = persons.find((p) => p.id === anchorId) ?? null
+
+  const setAnchorId = (id: string | null) => {
+    navigate({ search: { id: id || undefined } })
+  }
 
   const nama = (id: string) => persons.find((p) => p.id === id)?.fullName ?? '—'
   const tahun = (id: string) => persons.find((p) => p.id === id)?.birthDate?.slice(0, 4) ?? '—'
@@ -148,15 +167,25 @@ function TabelPage() {
                 </p>
               </div>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setAnchorId(null)
-                setQ('')
-              }}
-            >
-              Ganti Acuan
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDetailId(anchor.id)}
+              >
+                <Eye size={14} /> Detail
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setAnchorId(null)
+                  setQ('')
+                }}
+              >
+                Ganti Acuan
+              </Button>
+            </div>
           </div>
 
           <div className="mb-4 flex flex-wrap gap-2">
@@ -189,13 +218,6 @@ function TabelPage() {
             >
               <ArrowUp size={14} /> Tambah Orang Tua
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => openDialog({ mode: 'create' })}
-            >
-              <Plus size={14} /> Anggota Baru
-            </Button>
           </div>
 
           {rows.length === 0 ? (
@@ -210,6 +232,7 @@ function TabelPage() {
                     <th className="px-3 py-2.5">Relasi</th>
                     <th className="px-3 py-2.5">Nama</th>
                     <th className="px-3 py-2.5">Tahun Lahir</th>
+                    <th className="px-3 py-2.5"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -230,11 +253,26 @@ function TabelPage() {
                         </button>
                       </td>
                       <td className="px-3 py-2.5 text-muted-foreground">{r.lahir}</td>
+                      <td className="px-3 py-2.5">
+                        <button
+                          type="button"
+                          title={`Lihat detail ${r.nama}`}
+                          onClick={() => setDetailId(r.id)}
+                          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                        >
+                          <Eye size={14} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          )}
+          {rows.length > 0 && (
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Klik nama untuk menjadikannya acuan, klik tombol <b>Detail</b> untuk melihat informasi lengkap.
+            </p>
           )}
         </section>
       )}
@@ -247,6 +285,101 @@ function TabelPage() {
           onClose={() => setDialog(null)}
         />
       )}
+
+      {detailId && (() => {
+        const person = persons.find((p) => p.id === detailId)
+        if (!person || !data) return null
+        const nama = (id: string) => persons.find((p) => p.id === id)?.fullName ?? '—'
+        const ortu = data.parentLinks.filter((l) => l.childId === person.id)
+        const anak = data.parentLinks.filter((l) => l.parentId === person.id)
+        const pasangan = data.partnerships
+          .filter((ps) => ps.partnerAId === person.id || ps.partnerBId === person.id)
+          .map((ps) => ({
+            orang: ps.partnerAId === person.id ? ps.partnerBId : ps.partnerAId,
+            status: ps.status,
+          }))
+        return (
+          <Dialog open onOpenChange={() => setDetailId(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  {person.photoUrl ? (
+                    <img src={person.photoUrl} alt={person.fullName} className="h-12 w-12 rounded-full border border-border object-cover" />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-sm font-bold text-secondary-foreground">
+                      {person.fullName.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')}
+                    </div>
+                  )}
+                  <div>
+                    <DialogTitle>{person.fullName}</DialogTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {person.gender === 'L' ? 'Laki-laki' : person.gender === 'P' ? 'Perempuan' : '—'}
+                    </p>
+                  </div>
+                </div>
+              </DialogHeader>
+              <div className="space-y-4 text-sm">
+                {(person.birthDate || person.deathDate) && (
+                  <div className="grid gap-1">
+                    {person.birthDate && (
+                      <div className="flex gap-2">
+                        <span className="w-20 text-muted-foreground">Lahir</span>
+                        <span className="font-medium">{person.birthDate}</span>
+                      </div>
+                    )}
+                    {person.deathDate && (
+                      <div className="flex gap-2">
+                        <span className="w-20 text-muted-foreground">Wafat</span>
+                        <span className="font-medium">{person.deathDate}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {ortu.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs text-muted-foreground uppercase tracking-wide">Orang Tua</p>
+                    <ul className="list-none space-y-0.5 p-0">
+                      {ortu.map((l) => <li key={l.id}>{nama(l.parentId)}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {pasangan.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs text-muted-foreground uppercase tracking-wide">Pasangan</p>
+                    <ul className="list-none space-y-0.5 p-0">
+                      {pasangan.map((ps, i) => (
+                        <li key={i}>
+                          {nama(ps.orang)}
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            ({ps.status === 'cerai' ? 'cerai' : 'menikah'})
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {anak.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs text-muted-foreground uppercase tracking-wide">Anak</p>
+                    <ul className="list-none space-y-0.5 p-0">
+                      {anak.map((l) => <li key={l.id}>{nama(l.childId)}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {person.notes && (
+                  <div>
+                    <p className="mb-1 text-xs text-muted-foreground uppercase tracking-wide">Catatan</p>
+                    <p className="whitespace-pre-wrap text-card-foreground">{person.notes}</p>
+                  </div>
+                )}
+              </div>
+              <Button variant="outline" className="w-full" onClick={() => setDetailId(null)}>
+                Tutup
+              </Button>
+            </DialogContent>
+          </Dialog>
+        )
+      })()}
     </main>
   )
 }
