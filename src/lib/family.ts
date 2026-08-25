@@ -8,6 +8,7 @@ import {
   addPerson,
   editPerson,
   getFamilyData,
+  linkPartners,
   removePerson,
 } from './family.server'
 
@@ -99,4 +100,21 @@ export const createPartnerOf = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { personId, status, marriedDate, ...personValues } = data
     return addPartner(personValues, personId, { status, marriedDate })
+  })
+
+const partnershipInput = z.object({
+  aId: z.uuid('ID tidak valid'),
+  bId: z.uuid('ID tidak valid'),
+  status: z.enum(['menikah', 'cerai']).default('menikah'),
+  marriedDate: z.preprocess(emptyToNull, dateStr.nullable()),
+})
+
+export const createPartnership = createServerFn({ method: 'POST' })
+  .validator(partnershipInput)
+  .handler(async ({ data }) => {
+    await linkPartners(data.aId, data.bId, {
+      status: data.status,
+      marriedDate: data.marriedDate,
+    })
+    return { ok: true }
   })

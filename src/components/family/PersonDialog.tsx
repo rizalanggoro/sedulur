@@ -5,6 +5,7 @@ import { Trash2 } from 'lucide-react'
 import {
   createChildOf,
   createParentOf,
+  createPartnership,
   createPartnerOf,
   createPerson,
   deletePerson,
@@ -72,9 +73,11 @@ const emptyForm = {
 
 export function PersonDialog({
   state,
+  persons = [],
   onClose,
 }: {
   state: NonNullable<PersonDialogState>
+  persons?: Person[]
   onClose: () => void
 }) {
   const qc = useQueryClient()
@@ -92,6 +95,9 @@ export function PersonDialog({
   })
   const [status, setStatus] = useState<'menikah' | 'cerai'>('menikah')
   const [marriedDate, setMarriedDate] = useState('')
+  // 'child': orangtua kedua (existing); 'partner': '' = buat baru, selain itu id anggota existing
+  const [secondParent, setSecondParent] = useState('')
+  const [existingPartner, setExistingPartner] = useState('')
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => setErr(null), [form])
@@ -104,6 +110,14 @@ export function PersonDialog({
   const relation = state.mode === 'create' ? state.relation : undefined
   const isEdit = state.mode === 'edit'
 
+  // Default orangtua kedua: pasangan dari node yang diklik.
+  useEffect(() => {
+    if (relation?.kind === 'child') {
+      setSecondParent(relation.parentIds?.[1] ?? '')
+    }
+  }, [])
+  useEffect(() => setErr(null), [form, secondParent, existingPartner])
+
   const save = useMutation({
     mutationFn: async () => {
       if (state.mode === 'edit') {
@@ -115,13 +129,21 @@ export function PersonDialog({
         return
       }
       if (relation.kind === 'child') {
-        await createChildOf({
-          data: { ...form, parentIds: relation.parentIds ?? [relation.person.id] },
-        })
+        const parentIds = [
+          relation.person.id,
+          ...(secondParent ? [secondParent] : []),
+        ]
+        await createChildOf({ data: { ...form, parentIds } })
         return
       }
       if (relation.kind === 'parent') {
         await createParentOf({ data: { ...form, childId: relation.person.id } })
+        return
+      }
+      if (existingPartner) {
+        await createPartnership({
+          data: { aId: relation.person.id, bId: existingPartner, status, marriedDate },
+        })
         return
       }
       await createPartnerOf({
@@ -176,14 +198,73 @@ export function PersonDialog({
         </DialogHeader>
 
         <form onSubmit={submit} className="grid gap-4">
+          {relation?.kind === 'child' && (
+            <div className="grid gap-2">
+              <Label>Orangtua Kedua (opsional)</Label>
+              <Select
+                value={secondParent}
+                onValueChange={(v) => setSecondParent(v === ' ' ? '' : v)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="— Tidak ada —" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value=" ">— Tidak ada —</SelectItem>
+                  {persons
+                    .filter((p) => p.id !== relation.person.id)
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.fullName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="m-0 text-xs text-[var(--sea-ink-soft)]">
+                Pilih pasangan dari {relation.person.fullName} agar anak tertaut ke
+                ayah &amp; ibu sekaligus.
+              </p>
+            </div>
+          )}
+
+          {relation?.kind === 'partner' && (
+            <div className="grid gap-2">
+              <Label>Pasangan</Label>
+              <Select
+                value={existingPartner}
+                onValueChange={(v) => setExistingPartner(v === ' ' ? '' : v)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="— Buat anggota baru —" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value=" ">— Buat anggota baru —</SelectItem>
+                  {persons
+                    .filter((p) => p.id !== relation.person.id)
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.fullName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="m-0 text-xs text-[var(--sea-ink-soft)]">
+                Sudah ada datanya? Pilih nama di atas untuk menautkan langsung.
+              </p>
+            </div>
+          )}
+
           <div className="grid gap-2">
-            <Label htmlFor="fullName">Nama Lengkap *</Label>
+            <Label htmlFor="fullName">
+              Nama Lengkap {existingPartner ? '' : '*'}
+            </Label>
             <Input
               id="fullName"
               value={form.fullName}
               onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-              placeholder="cth. Rizal Anggoro"
-              required
+              placeholder={
+                existingPartner ? 'Tidak diperlukan' : 'cth. Rizal Anggoro'
+              }
+              disabled={Boolean(existingPartner)}
               autoFocus
             />
           </div>

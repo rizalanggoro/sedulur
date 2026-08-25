@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Users } from 'lucide-react'
 
 import { getFamily } from '#/lib/family'
-import type { Person } from '#/db/schema'
 import { layoutFamily } from './layout'
-import type { NodeActionKind } from './layout'
+import type { NodeActionHandler } from './layout'
 import { FamilyCanvas } from './FamilyCanvas'
 import { PersonDialog, type PersonDialogState } from './PersonDialog'
 import { Button } from '#/components/ui/button'
@@ -24,15 +23,19 @@ export function FamilyPage() {
     setDialogKey((k) => k + 1)
   }
 
-  const handleNodeAction = (kind: NodeActionKind, person: Person) => {
-    if (!data) return
+  // Stabil: dibuat sekali agar identitasnya aman dipakai di dalam node data.
+  const dataRef = useRef(data)
+  dataRef.current = data
+  const handleNodeAction = useCallback<NodeActionHandler>((kind, person) => {
+    const d = dataRef.current
+    if (!d) return
     if (kind === 'edit') {
       openDialog({ mode: 'edit', person })
       return
     }
     if (kind === 'child') {
       // Sertakan pasangan pertama sebagai orangtua kedua bila ada.
-      const partnership = data.partnerships.find(
+      const partnership = d.partnerships.find(
         (ps) => ps.partnerAId === person.id || ps.partnerBId === person.id,
       )
       const spouseId =
@@ -50,11 +53,11 @@ export function FamilyPage() {
       return
     }
     openDialog({ mode: 'create', relation: { kind, person } })
-  }
+  }, [])
 
   const { nodes, edges } = useMemo(
-    () => (data ? layoutFamily(data) : { nodes: [], edges: [] }),
-    [data],
+    () => (data ? layoutFamily(data, handleNodeAction) : { nodes: [], edges: [] }),
+    [data, handleNodeAction],
   )
 
   const isEmpty = !isPending && data !== undefined && data.persons.length === 0
@@ -103,11 +106,16 @@ export function FamilyPage() {
       )}
 
       {!isPending && !isError && !isEmpty && (
-        <FamilyCanvas nodes={nodes} edges={edges} onNodeAction={handleNodeAction} />
+        <FamilyCanvas nodes={nodes} edges={edges} />
       )}
 
       {dialog && (
-        <PersonDialog key={dialogKey} state={dialog} onClose={() => setDialog(null)} />
+        <PersonDialog
+          key={dialogKey}
+          state={dialog}
+          persons={data?.persons ?? []}
+          onClose={() => setDialog(null)}
+        />
       )}
     </TreeShell>
   )

@@ -14,7 +14,7 @@ import {
 import '@xyflow/react/dist/style.css'
 
 import { PersonNode } from './PersonNode'
-import { CARD_H, CARD_W, type ChildEdge, type NodeActionKind, type PersonNode as PersonNodeType } from './layout'
+import { CARD_H, CARD_W, type ChildEdge, type PersonNode as PersonNodeType } from './layout'
 
 const nodeTypes = { person: PersonNode }
 
@@ -25,16 +25,25 @@ function ChildEdgeView({ id, targetX, targetY, data }: EdgeProps<ChildEdge>) {
   const first = useInternalNode(anchorIds[0] ?? '')
   const second = useInternalNode(anchorIds[1] ?? '')
 
-  const bottoms = [first, second]
-    .filter((n): n is NonNullable<typeof n> => Boolean(n))
-    .map((n) => ({
-      x: n.internals.positionAbsolute.x + n.measured.width! / 2,
-      y: n.internals.positionAbsolute.y + n.measured.height!,
-    }))
-  if (bottoms.length === 0) return null
+  const nodes = [first, second].filter(
+    (n): n is NonNullable<typeof n> => Boolean(n),
+  )
+  if (nodes.length === 0) return null
 
-  const anchorX = bottoms.reduce((s, p) => s + p.x, 0) / bottoms.length
-  const startY = Math.max(...bottoms.map((p) => p.y))
+  const centerX = (n: NonNullable<typeof first>) =>
+    n.internals.positionAbsolute.x + n.measured.width! / 2
+  const centerY = (n: NonNullable<typeof first>) =>
+    n.internals.positionAbsolute.y + n.measured.height! / 2
+  const bottomY = (n: NonNullable<typeof first>) =>
+    n.internals.positionAbsolute.y + n.measured.height!
+
+  const anchorX = nodes.reduce((s, n) => s + centerX(n), 0) / nodes.length
+  // Pasangan: garis turun dari tengah garis penghubung keduanya (gaya ┬).
+  // Orangtua tunggal: turun dari bawah kartunya.
+  const startY =
+    nodes.length >= 2
+      ? nodes.reduce((s, n) => s + centerY(n), 0) / nodes.length
+      : Math.max(...nodes.map((n) => bottomY(n)))
   const midY = startY + (targetY - startY) / 2
   const path = `M ${anchorX} ${startY} L ${anchorX} ${midY} L ${targetX} ${midY} L ${targetX} ${targetY}`
 
@@ -48,11 +57,9 @@ const defaultViewport = { x: 0, y: 0, zoom: 1 }
 function FlowInner({
   nodes,
   edges,
-  onNodeAction,
 }: {
   nodes: PersonNodeType[]
   edges: Parameters<typeof ReactFlow>[0]['edges']
-  onNodeAction: (kind: NodeActionKind, person: PersonNodeType['data']['person']) => void
 }) {
   const { fitView } = useReactFlow()
 
@@ -70,9 +77,6 @@ function FlowInner({
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
-      onNodeClick={(_, node) =>
-        onNodeAction('edit', (node.data as PersonNodeType['data']).person)
-      }
       defaultViewport={defaultViewport}
       minZoom={0.15}
       maxZoom={2}
@@ -95,11 +99,9 @@ function FlowInner({
 export function FamilyCanvas({
   nodes,
   edges,
-  onNodeAction,
 }: {
   nodes: PersonNodeType[]
   edges: Parameters<typeof ReactFlow>[0]['edges']
-  onNodeAction: (kind: NodeActionKind, person: PersonNodeType['data']['person']) => void
 }) {
   // React Flow hanya dirender di client agar aman terhadap SSR.
   const [ready, setReady] = useState(false)
@@ -116,7 +118,7 @@ export function FamilyCanvas({
   return (
     <div className="h-full w-full overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--foam)]">
       <ReactFlowProvider>
-        <FlowInner nodes={nodes} edges={edges} onNodeAction={onNodeAction} />
+        <FlowInner nodes={nodes} edges={edges} />
       </ReactFlowProvider>
     </div>
   )

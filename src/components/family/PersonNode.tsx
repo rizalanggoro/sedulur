@@ -103,7 +103,7 @@ function NodeActionButton({
       type="button"
       title={label}
       aria-label={label}
-      className="nodrag nopan pointer flex h-7 w-7 items-center justify-center rounded-full text-[var(--sea-ink)] transition hover:bg-[var(--sand)] hover:text-[var(--palm)]"
+      className="nodrag nopan flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-[var(--sea-ink)] transition hover:bg-[var(--sand)] hover:text-[var(--palm)]"
       onClick={(e) => {
         e.stopPropagation()
         onClick()

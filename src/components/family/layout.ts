@@ -12,10 +12,14 @@ const UNIT_GAP = 64
 const RANK_GAP = 110
 
 export type NodeActionKind = 'edit' | 'child' | 'partner' | 'parent'
+export type NodeActionHandler = (
+  kind: NodeActionKind,
+  person: Person,
+) => void
 
 export type PersonFlowData = {
   person: Person
-  onAction?: (kind: NodeActionKind, person: Person) => void
+  onAction?: NodeActionHandler
 }
 export type ChildEdgeData = { anchorIds: string[] }
 
@@ -28,7 +32,10 @@ export type ChildEdge = Edge<ChildEdgeData, 'child'>
  * lalu diposisikan berdampingan. Anak menggantung dari titik tengah unit
  * orangtuanya (lihat ChildEdge).
  */
-export function layoutFamily(data: FamilyData): {
+export function layoutFamily(
+  data: FamilyData,
+  onAction?: PersonFlowData['onAction'],
+): {
   nodes: PersonNode[]
   edges: Edge[]
 } {
@@ -125,7 +132,7 @@ export function layoutFamily(data: FamilyData): {
     id: p.id,
     type: 'person',
     position: posById.get(p.id)!,
-    data: { person: p },
+    data: { person: p, onAction },
   }))
 
   const edges: Edge[] = []

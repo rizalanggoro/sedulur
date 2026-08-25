@@ -66,6 +66,21 @@ try {
   assert.equal(ps?.status, 'cerai')
   assert.equal(ps?.marriedDate, '2020-01-01')
 
+  // Validasi penautan pasangan existing
+  await assert.rejects(
+    () => mod.linkPartners(anak.id, anak.id, { status: 'menikah' }),
+    /dirinya sendiri/,
+  )
+  await assert.rejects(
+    () => mod.linkPartners(anak.id, mantan.id, { status: 'menikah' }),
+    /sudah terdaftar sebagai pasangan/,
+  )
+  await assert.rejects(
+    () => mod.linkPartners(mantan.id, anak.id, { status: 'menikah' }),
+    /sudah terdaftar sebagai pasangan/,
+    'duplikasi terdeteksi walau urutan dibalik',
+  )
+
   // Hapus kakek → parent link cascade terhapus
   await mod.removePerson(kakek.id)
   created.splice(created.indexOf(kakek.id), 1)

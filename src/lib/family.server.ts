@@ -1,6 +1,6 @@
 // Helper khusus server: akses DB + validasi relasi.
 // Jangan diimpor dari kode client — dipakai oleh src/lib/family.ts.
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, or } from 'drizzle-orm'
 
 import { db } from '#/db'
 import {
@@ -89,6 +89,41 @@ export async function addParent(
   return parent
 }
 
+export async function linkPartners(
+  aId: string,
+  bId: string,
+  relation: { status: string; marriedDate?: string | null },
+): Promise<void> {
+  if (aId === bId) {
+    throw new Error('Tidak bisa menjadi pasangan dirinya sendiri')
+  }
+  const found = await db
+    .select({ id: persons.id })
+    .from(persons)
+    .where(inArray(persons.id, [aId, bId]))
+  if (found.length !== 2) {
+    throw new Error('Anggota keluarga tidak ditemukan')
+  }
+  const existing = await db
+    .select()
+    .from(partnerships)
+    .where(or(eq(partnerships.partnerAId, aId), eq(partnerships.partnerBId, aId)))
+  const dup = existing.some(
+    (ps) =>
+      (ps.partnerAId === aId && ps.partnerBId === bId) ||
+      (ps.partnerAId === bId && ps.partnerBId === aId),
+  )
+  if (dup) {
+    throw new Error('Keduanya sudah terdaftar sebagai pasangan')
+  }
+  await db.insert(partnerships).values({
+    partnerAId: aId,
+    partnerBId: bId,
+    status: relation.status,
+    marriedDate: relation.marriedDate ?? null,
+  })
+}
+
 export async function addPartner(
   personValues: typeof persons.$inferInsert,
   anchorId: string,
@@ -97,11 +132,6 @@ export async function addPartner(
   const [anchor] = await db.select().from(persons).where(eq(persons.id, anchorId))
   if (!anchor) throw new Error('Anggota keluarga tidak ditemukan')
   const partner = await addPerson(personValues)
-  await db.insert(partnerships).values({
-    partnerAId: anchorId,
-    partnerBId: partner.id,
-    status: relation.status,
-    marriedDate: relation.marriedDate ?? null,
-  })
+  await linkPartners(anchorId, partner.id, relation)
   return partner
 }
