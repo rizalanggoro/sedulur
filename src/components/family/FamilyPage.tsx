@@ -134,6 +134,10 @@ export function FamilyPage() {
           family={data ?? null}
           onEdit={(p) => handleNodeAction('edit', p)}
           onClose={() => setDetailId(null)}
+          onFocusPerson={(id) => {
+            setDetailId(id)
+            window.dispatchEvent(new CustomEvent('sedulur:focus-person', { detail: id }))
+          }}
           onLinkParent={async (parentId, childId) => {
             await linkParentToChild({ data: { parentId, childId } })
             await qc.invalidateQueries({ queryKey: ['family'] })
@@ -161,12 +165,14 @@ function DetailPanel({
   family,
   onEdit,
   onClose,
+  onFocusPerson,
   onLinkParent,
 }: {
   person?: Person
   family: { persons: Person[]; parentLinks: ParentLink[]; partnerships: Partnership[] } | null
   onEdit: (p: Person) => void
   onClose: () => void
+  onFocusPerson: (id: string) => void
   onLinkParent?: (parentId: string, childId: string) => Promise<void>
 }) {
   const [linkPending, setLinkPending] = useState(false)
@@ -269,7 +275,15 @@ function DetailPanel({
               <p className="m-0 mb-1 text-xs text-muted-foreground uppercase tracking-wide">Orangtua</p>
               <ul className="m-0 list-none space-y-0.5 p-0 text-card-foreground">
                 {ortu.map((l) => (
-                  <li key={l.id}>{nama(l.parentId)}</li>
+                  <li key={l.id}>
+                    <button
+                      type="button"
+                      onClick={() => onFocusPerson(l.parentId)}
+                      className="cursor-pointer underline underline-offset-2 decoration-primary/40 transition-colors hover:text-primary"
+                    >
+                      {nama(l.parentId)}
+                    </button>
+                  </li>
                 ))}
               </ul>
             </div>
@@ -280,7 +294,13 @@ function DetailPanel({
               <ul className="m-0 list-none space-y-0.5 p-0 text-card-foreground">
                 {pasangan.map((ps, i) => (
                   <li key={i}>
-                    {nama(ps.orang)}
+                    <button
+                      type="button"
+                      onClick={() => onFocusPerson(ps.orang)}
+                      className="cursor-pointer underline underline-offset-2 decoration-primary/40 transition-colors hover:text-primary"
+                    >
+                      {nama(ps.orang)}
+                    </button>
                     <span className="text-xs text-muted-foreground">
                       {' '}
                       ({ps.status === 'cerai' ? 'cerai' : 'menikah'})
@@ -295,7 +315,15 @@ function DetailPanel({
               <p className="m-0 mb-1 text-xs text-muted-foreground uppercase tracking-wide">Anak</p>
               <ul className="m-0 list-none space-y-0.5 p-0 text-card-foreground">
                 {anak.map((l) => (
-                  <li key={l.id}>{nama(l.childId)}</li>
+                  <li key={l.id}>
+                    <button
+                      type="button"
+                      onClick={() => onFocusPerson(l.childId)}
+                      className="cursor-pointer underline underline-offset-2 decoration-primary/40 transition-colors hover:text-primary"
+                    >
+                      {nama(l.childId)}
+                    </button>
+                  </li>
                 ))}
               </ul>
             </div>
