@@ -1,8 +1,9 @@
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 
 import ThemeToggle from './ThemeToggle'
+import { SearchCommand } from './SearchCommand'
 import { getFamily } from '#/lib/family'
 import { Button } from '#/components/ui/button'
 
@@ -27,6 +28,16 @@ export default function Header() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-muted-foreground"
+            onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+          >
+            <Search size={14} />
+            <span className="hidden sm:inline">Cari...</span>
+            <kbd className="pointer-events-none hidden select-none rounded border border-border bg-muted px-1.5 text-[10px] font-medium sm:inline">⌘K</kbd>
+          </Button>
           <ThemeToggle />
           {kosong && (
             <Button
@@ -38,6 +49,7 @@ export default function Header() {
           )}
         </div>
       </div>
+      <SearchCommand />
     </header>
   )
 }
