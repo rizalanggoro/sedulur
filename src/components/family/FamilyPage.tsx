@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, Users, X } from 'lucide-react'
 
-import { getFamily } from '#/lib/family'
+import { getFamily, linkParentToChild } from '#/lib/family'
 import type { ParentLink, Partnership, Person } from '#/db/schema'
 import { layoutFamily, computeBirthOrders } from './layout'
 import type { NodeActionHandler } from './layout'
@@ -11,6 +11,7 @@ import { PersonDialog, type PersonDialogState } from './PersonDialog'
 import { Button } from '#/components/ui/button'
 
 export function FamilyPage() {
+  const qc = useQueryClient()
   const { data, isPending, isError, error } = useQuery({
     queryKey: ['family'],
     queryFn: () => getFamily(),
@@ -130,6 +131,10 @@ export function FamilyPage() {
           family={data ?? null}
           onEdit={(p) => handleNodeAction('edit', p)}
           onClose={() => setDetailId(null)}
+          onLinkParent={async (parentId, childId) => {
+            await linkParentToChild({ data: { parentId, childId } })
+            await qc.invalidateQueries({ queryKey: ['family'] })
+          }}
         />
       )}
     </TreeShell>
@@ -153,12 +158,15 @@ function DetailPanel({
   family,
   onEdit,
   onClose,
+  onLinkParent,
 }: {
   person?: Person
   family: { persons: Person[]; parentLinks: ParentLink[]; partnerships: Partnership[] } | null
   onEdit: (p: Person) => void
   onClose: () => void
+  onLinkParent?: (parentId: string, childId: string) => Promise<void>
 }) {
+  const [linkPending, setLinkPending] = useState(false)
   if (!person || !family) return null
 
   const byId = new Map(family.persons.map((p) => [p.id, p]))
@@ -181,6 +189,23 @@ function DetailPanel({
 
   const lahir = formatTanggal(person.birthDate)
   const wafat = formatTanggal(person.deathDate)
+
+  // Anak lahir sebelum orangtuanya menikah? Tawarkan menautkan pasangan
+  // orangtua tersebut sebagai orangtua kedua.
+  const myLinks = family.parentLinks.filter((l) => l.childId === person.id)
+  let missingParent: Person | null = null
+  if (onLinkParent && myLinks.length === 1) {
+    const p = myLinks[0].parentId
+    const ps = family.partnerships.find(
+      (x) => x.partnerAId === p || x.partnerBId === p,
+    )
+    if (ps) {
+      const partnerId = ps.partnerAId === p ? ps.partnerBId : ps.partnerAId
+      if (!myLinks.some((l) => l.parentId === partnerId)) {
+        missingParent = family.persons.find((x) => x.id === partnerId) ?? null
+      }
+    }
+  }
 
   return (
     <aside className="absolute right-4 top-4 z-20 max-h-[calc(100%-2rem)] w-80 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-5 shadow-xl backdrop-blur">
@@ -274,6 +299,31 @@ function DetailPanel({
               </ul>
             </div>
           )}
+        </div>
+      )}
+
+      {missingParent && (
+        <div className="mt-4 rounded-xl border border-[var(--chip-line)] bg-[var(--sand)] p-3 text-sm">
+          <p className="m-0 text-[var(--sea-ink)]">
+            Saat ini hanya tertaut ke <b>{nama(myLinks[0].parentId)}</b>.
+          </p>
+          <button
+            type="button"
+            disabled={linkPending}
+            className="mt-2 w-full cursor-pointer rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--palm)] transition hover:bg-[var(--foam)] disabled:opacity-50"
+            onClick={async () => {
+              setLinkPending(true)
+              try {
+                await onLinkParent?.(missingParent.id, person.id)
+              } finally {
+                setLinkPending(false)
+              }
+            }}
+          >
+            {linkPending
+              ? 'Menautkan…'
+              : `Tautkan ${missingParent.fullName} sebagai orangtua juga`}
+          </button>
         </div>
       )}
 

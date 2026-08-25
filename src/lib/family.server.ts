@@ -91,6 +91,51 @@ export async function addParent(
   return parent
 }
 
+/** Tautkan orangtua EXISTING ke anak (mis. istri ayah pada anak lahir sebelum menikah). */
+export async function linkParent(parentId: string, childId: string): Promise<void> {
+  if (parentId === childId) {
+    throw new Error('Tidak bisa menjadi orangtua dirinya sendiri')
+  }
+  const found = await db
+    .select()
+    .from(persons)
+    .where(inArray(persons.id, [parentId, childId]))
+  if (found.length !== 2) throw new Error('Anggota keluarga tidak ditemukan')
+  const child = found.find((f) => f.id === childId)!
+
+  const existing = await db
+    .select()
+    .from(parentLinks)
+    .where(eq(parentLinks.childId, childId))
+  if (existing.some((l) => l.parentId === parentId)) {
+    throw new Error('Sudah terdaftar sebagai orangtua anak ini')
+  }
+  if (existing.length >= 2) {
+    throw new Error(`${child.fullName} sudah memiliki 2 orangtua`)
+  }
+  // Anti-siklus: parentId tidak boleh merupakan KETURUNAN childId
+  // (menautkan anak/cucu sebagai orangtua = siklus).
+  const seen = new Set<string>([childId])
+  const frontier = [childId]
+  while (frontier.length > 0) {
+    const cur = frontier.pop()!
+    const links = await db
+      .select()
+      .from(parentLinks)
+      .where(eq(parentLinks.parentId, cur))
+    for (const l of links) {
+      if (l.childId === parentId) {
+        throw new Error('Tidak boleh ada siklus dalam silsilah')
+      }
+      if (!seen.has(l.childId)) {
+        seen.add(l.childId)
+        frontier.push(l.childId)
+      }
+    }
+  }
+  await db.insert(parentLinks).values({ parentId, childId })
+}
+
 export async function linkPartners(
   aId: string,
   bId: string,

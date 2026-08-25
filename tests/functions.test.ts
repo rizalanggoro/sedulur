@@ -91,6 +91,24 @@ try {
     'relasi kakek ikut terhapus',
   )
 
+  // Tautkan orangtua existing: berhasil, duplikat ditolak, siklus ditolak
+  await mod.linkParent(mantan.id, anak.id)
+  const family4 = await mod.getFamilyData()
+  assert.equal(
+    family4.parentLinks.filter((l) => l.childId === anak.id).length,
+    2,
+    'anak kembali punya 2 orangtua setelah ditautkan',
+  )
+  await assert.rejects(
+    () => mod.linkParent(mantan.id, anak.id),
+    /Sudah terdaftar/,
+  )
+  await assert.rejects(
+    () => mod.linkParent(anak.id, nenek.id),
+    /siklus/,
+    'menjadikan anak sebagai orangtua leluhur harus ditolak',
+  )
+
   console.log('server functions OK')
 } finally {
   for (const id of created) {

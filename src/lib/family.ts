@@ -8,6 +8,7 @@ import {
   addPerson,
   editPerson,
   getFamilyData,
+  linkParent,
   linkPartners,
   removePerson,
 } from './family.server'
@@ -116,5 +117,17 @@ export const createPartnership = createServerFn({ method: 'POST' })
       status: data.status,
       marriedDate: data.marriedDate,
     })
+    return { ok: true }
+  })
+
+const linkParentInput = z.object({
+  parentId: z.uuid('ID tidak valid'),
+  childId: z.uuid('ID tidak valid'),
+})
+
+export const linkParentToChild = createServerFn({ method: 'POST' })
+  .validator(linkParentInput)
+  .handler(async ({ data }) => {
+    await linkParent(data.parentId, data.childId)
     return { ok: true }
   })

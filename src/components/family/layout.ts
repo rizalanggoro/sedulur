@@ -123,11 +123,6 @@ export function layoutFamily(
       parentsByChild.set(link.childId, []).get(link.childId)!).push(link.parentId)
   }
 
-  // Ibu utama anak: orangtua berjenis kelamin P, fallback orangtua pertama.
-  const motherOf = (parents: string[]): string | undefined => {
-    const valid = parents.filter((p) => byIndex.has(p))
-    return valid.find((p) => byIndex.get(p)?.gender === 'P') ?? valid[0]
-  }
   // Sumber garis pernikahan:
   // 1) Person yang sudah berakar di pohon (punya orangtua) di atas —
   //    pasangan bebas menggantung di bawahnya, tidak masuk baris istri lain.
@@ -141,6 +136,30 @@ export function layoutFamily(
     if (gb === 'P' && ga !== 'P') return ps.partnerAId
     if (ga === 'P' && gb !== 'P') return ps.partnerBId
     return ps.partnerAId
+  }
+
+  // Jangkar garis anak (dulu "ibu"):
+  // 1) orangtua ber-gender P;
+  // 2) bila dua orangtua berpasangan → target pernikahan (sisi istri),
+  //    konsisten tanpa peduli urutan klik saat menambahkan anak;
+  // 3) fallback: orangtua pertama.
+  const anchorOf = (parents: string[]): string | undefined => {
+    const valid = parents.filter((p) => byIndex.has(p))
+    if (valid.length === 0) return undefined
+    const female = valid.find((p) => byIndex.get(p)?.gender === 'P')
+    if (female) return female
+    if (valid.length === 2) {
+      const ps = partnerships.find(
+        (x) =>
+          (x.partnerAId === valid[0] && x.partnerBId === valid[1]) ||
+          (x.partnerAId === valid[1] && x.partnerBId === valid[0]),
+      )
+      if (ps) {
+        const s = spouseSourceOf(ps)
+        return s === ps.partnerAId ? ps.partnerBId : ps.partnerAId
+      }
+    }
+    return valid[0]
   }
 
   // ---------- Layout dagre langsung pada person ----------
@@ -159,7 +178,7 @@ export function layoutFamily(
     g.setEdge(s, t)
   }
   for (const [childId, parents] of parentsByChild) {
-    const m = motherOf(parents)
+    const m = anchorOf(parents)
     if (m && byIndex.has(childId) && m !== childId) g.setEdge(m, childId)
   }
   Dagre.layout(g)
@@ -222,7 +241,7 @@ export function layoutFamily(
   // Garis anak: bezier dari bawah ibu ke atas anak
   for (const [childId, parents] of parentsByChild) {
     if (!byIndex.has(childId)) continue
-    const anchor = motherOf(parents)
+    const anchor = anchorOf(parents)
     if (!anchor) continue
     edges.push({
       id: `pc:${childId}`,
