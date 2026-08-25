@@ -86,7 +86,6 @@ function FlowInner({
         position="bottom-right"
         pannable
         zoomable
-        className="!bg-white/80"
         nodeColor={() => '#8fb8a8'}
       />
     </ReactFlow>

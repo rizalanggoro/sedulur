@@ -345,3 +345,20 @@ a {
     color: var(--foreground);
   }
 }
+
+/* React Flow mengikuti tema aplikasi (terang & gelap) */
+:root {
+  --xy-controls-button-background-color: var(--surface-strong);
+  --xy-controls-button-background-color-hover: var(--sand);
+  --xy-controls-button-color: var(--sea-ink);
+  --xy-controls-button-color-hover: var(--palm);
+  --xy-controls-button-border-color: var(--line);
+  --xy-controls-box-shadow: 0 10px 28px rgba(30, 90, 72, 0.16);
+  --xy-minimap-background-color: var(--surface-strong);
+  --xy-minimap-mask-background-color: color-mix(
+    in oklab,
+    var(--sea-ink) 14%,
+    transparent
+  );
+  --xy-attribution-background-color: transparent;
+}

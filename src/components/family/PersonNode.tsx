@@ -63,7 +63,7 @@ export function PersonNode({ data, selected }: NodeProps<PersonNode>) {
 
       {/* Aksi cepat konteks node (tampil saat hover / terpilih) */}
       <div
-        className={`absolute -bottom-10 left-1/2 z-10 flex -translate-x-1/2 gap-1 whitespace-nowrap rounded-full border border-[var(--line)] bg-white px-1.5 py-1 shadow-lg transition-opacity ${
+        className={`absolute -bottom-10 left-1/2 z-10 flex -translate-x-1/2 gap-1 whitespace-nowrap rounded-full border border-[var(--line)] bg-[var(--surface-strong)] px-1.5 py-1 shadow-lg backdrop-blur transition-opacity ${
           selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}
       >
