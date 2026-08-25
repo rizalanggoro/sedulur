@@ -31,6 +31,13 @@ export default function Header() {
           >
             Silsilah
           </Link>
+          <Link
+            to="/tabel"
+            className="nav-link"
+            activeProps={{ className: 'nav-link is-active' }}
+          >
+            Tabel
+          </Link>
         </div>
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
