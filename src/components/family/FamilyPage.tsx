@@ -72,6 +72,12 @@ export function FamilyPage() {
     [data, handleNodeAction],
   )
 
+  useEffect(() => {
+    const handler = () => setDetailId(null)
+    window.addEventListener('sedulur:deselect', handler)
+    return () => window.removeEventListener('sedulur:deselect', handler)
+  }, [])
+
   const isEmpty = !isPending && data !== undefined && data.persons.length === 0
 
   return (

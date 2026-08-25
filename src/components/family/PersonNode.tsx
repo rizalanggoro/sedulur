@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { ArrowUp, Baby, Heart, Pencil } from 'lucide-react'
 
 import type { PersonNode } from './layout'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 
 const genderAccent: Record<string, string> = {
   L: '#5b8fd6',
@@ -53,7 +54,7 @@ export function PersonNode({ data, selected }: NodeProps<PersonNode>) {
       <div
         className={`flex h-full w-full cursor-pointer items-center gap-3 rounded-2xl border bg-card px-3 shadow-sm backdrop-blur transition ${
           selected
-            ? 'border-primary ring-2 ring-primary/30'
+            ? 'border-primary border-2 ring-4 ring-primary/40 shadow-lg'
             : 'border-border'
         }`}
         style={{
@@ -118,17 +119,23 @@ function NodeActionButton({
   children: React.ReactNode
 }) {
   return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      className="nodrag nopan flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-foreground transition hover:bg-secondary hover:text-primary"
-      onClick={(e) => {
-        e.stopPropagation()
-        onClick()
-      }}
-    >
-      {children}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className="nodrag nopan flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-foreground transition hover:bg-secondary hover:text-primary"
+          onClick={(e) => {
+            e.stopPropagation()
+            onClick()
+          }}
+        >
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
   )
 }

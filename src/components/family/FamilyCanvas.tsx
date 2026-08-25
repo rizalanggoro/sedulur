@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -6,6 +6,8 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
+  type Edge,
+  type Node,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
@@ -19,9 +21,61 @@ function FlowInner({
   edges,
 }: {
   nodes: PersonNodeType[]
-  edges: Parameters<typeof ReactFlow>[0]['edges']
+  edges: Edge[]
 }) {
   const { fitView } = useReactFlow()
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+
+  const connectedIds = useMemo(() => {
+    if (!selectedNodeId) return null
+    const ids = new Set<string>()
+    ids.add(selectedNodeId)
+    for (const e of edges) {
+      if (e.source === selectedNodeId) ids.add(e.target)
+      if (e.target === selectedNodeId) ids.add(e.source)
+    }
+    return ids
+  }, [selectedNodeId, edges])
+
+  const highlightedEdges = useMemo(() => {
+    if (!connectedIds) return edges
+    return edges.map((e) => ({
+      ...e,
+      style: {
+        ...e.style,
+        opacity: connectedIds.has(e.source) && connectedIds.has(e.target) ? 1 : 0.15,
+      },
+    }))
+  }, [edges, connectedIds])
+
+  const dimmedNodes = useMemo(() => {
+    if (!connectedIds) return nodes.map((n) => ({ ...n, selected: false }))
+    return nodes.map((n) => ({
+      ...n,
+      selected: n.id === selectedNodeId,
+      style: { ...n.style, opacity: connectedIds.has(n.id) ? 1 : 0.25 },
+    }))
+  }, [nodes, connectedIds, selectedNodeId])
+
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      setSelectedNodeId((prev) => {
+        const next = prev === node.id ? null : node.id
+        if (!next) {
+          window.dispatchEvent(new CustomEvent('sedulur:deselect'))
+        } else {
+          void fitView({ nodes: [{ id: next }], duration: 300, maxZoom: 1, padding: 0.7 })
+        }
+        return next
+      })
+    },
+    [fitView],
+  )
+
+  const onPaneClick = useCallback(() => {
+    setSelectedNodeId(null)
+    window.dispatchEvent(new CustomEvent('sedulur:deselect'))
+  }, [])
 
   const signature = nodes.map((n) => n.id).join(',')
   useEffect(() => {
@@ -35,6 +89,7 @@ function FlowInner({
   useEffect(() => {
     const handler = (e: Event) => {
       const personId = (e as CustomEvent).detail as string
+      setSelectedNodeId(personId)
       void fitView({ nodes: [{ id: personId }], duration: 400, maxZoom: 1.25, padding: 0.9 })
     }
     window.addEventListener('sedulur:focus-person', handler)
@@ -43,9 +98,11 @@ function FlowInner({
 
   return (
     <ReactFlow
-      nodes={nodes}
-      edges={edges}
+      nodes={dimmedNodes}
+      edges={highlightedEdges}
       nodeTypes={nodeTypes}
+      onNodeClick={onNodeClick}
+      onPaneClick={onPaneClick}
       defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       minZoom={0.15}
       maxZoom={2}
@@ -64,7 +121,7 @@ export function FamilyCanvas({
   edges,
 }: {
   nodes: PersonNodeType[]
-  edges: Parameters<typeof ReactFlow>[0]['edges']
+  edges: Edge[]
 }) {
   const [ready, setReady] = useState(false)
   useEffect(() => setReady(true), [])
