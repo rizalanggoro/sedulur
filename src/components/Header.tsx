@@ -1,7 +1,15 @@
 import { Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import { Plus } from 'lucide-react'
+
 import ThemeToggle from './ThemeToggle'
+import { getFamily } from '#/lib/family'
+import { Button } from '#/components/ui/button'
 
 export default function Header() {
+  const { data } = useQuery({ queryKey: ['family'], queryFn: () => getFamily() })
+  const kosong = data !== undefined && data.persons.length === 0
+
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--header-bg)] px-4 backdrop-blur-lg">
       <nav className="page-wrap flex flex-wrap items-center gap-x-3 gap-y-2 py-3 sm:py-4">
@@ -23,17 +31,19 @@ export default function Header() {
           >
             Silsilah
           </Link>
-          <Link
-            to="/about"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Tentang
-          </Link>
         </div>
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <ThemeToggle />
+          {kosong && (
+            <Button
+              size="sm"
+              className="rounded-full"
+              onClick={() => window.dispatchEvent(new Event('sedulur:tambah-anggota'))}
+            >
+              <Plus size={16} /> Tambah Anggota
+            </Button>
+          )}
         </div>
       </nav>
     </header>

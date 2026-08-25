@@ -16,6 +16,13 @@ export function FamilyPage() {
     queryFn: () => getFamily(),
   })
 
+  // Tombol "Tambah Anggota" di header (tampil saat silsilah masih kosong)
+  useEffect(() => {
+    const open = () => openDialog({ mode: 'create' })
+    window.addEventListener('sedulur:tambah-anggota', open)
+    return () => window.removeEventListener('sedulur:tambah-anggota', open)
+  }, [])
+
   const [dialog, setDialog] = useState<PersonDialogState>(null)
   const [dialogKey, setDialogKey] = useState(0)
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -71,14 +78,6 @@ export function FamilyPage() {
 
   return (
     <TreeShell>
-      {!isEmpty && (
-        <div className="pointer-events-auto absolute left-4 top-4 z-10">
-          <Button onClick={() => openDialog({ mode: 'create' })} disabled={isPending}>
-            <Plus size={16} /> Tambah Anggota
-          </Button>
-        </div>
-      )}
-
       {isPending && (
         <div className="flex h-full items-center justify-center text-sm text-[var(--sea-ink-soft)]">
           Memuat silsilah…
