@@ -1,0 +1,326 @@
+import { useEffect, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Trash2 } from 'lucide-react'
+
+import {
+  createChildOf,
+  createParentOf,
+  createPartnerOf,
+  createPerson,
+  deletePerson,
+  updatePerson,
+} from '#/lib/family'
+import type { Person } from '#/db/schema'
+import { Button } from '#/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '#/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '#/components/ui/alert-dialog'
+import { Input } from '#/components/ui/input'
+import { Label } from '#/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '#/components/ui/select'
+import { Textarea } from '#/components/ui/textarea'
+
+export type DialogRelation = {
+  kind: 'child' | 'parent' | 'partner'
+  person: Person
+  /** Untuk kind 'child': orangtua lain (pasangan) yang ikut ditautkan. */
+  parentIds?: string[]
+}
+
+export type PersonDialogState =
+  | { mode: 'create'; relation?: DialogRelation }
+  | { mode: 'edit'; person: Person }
+  | null
+
+function errorMessage(e: unknown) {
+  const raw = e instanceof Error ? e.message : String(e)
+  // Error validasi zod terserialisasi sebagai daftar issue JSON
+  if (raw.trim().startsWith('[')) return 'Data tidak valid, periksa kembali isian.'
+  return raw
+}
+
+const emptyForm = {
+  fullName: '',
+  gender: '-' as '-' | 'L' | 'P',
+  birthDate: '',
+  deathDate: '',
+  photoUrl: '',
+  notes: '',
+}
+
+export function PersonDialog({
+  state,
+  onClose,
+}: {
+  state: NonNullable<PersonDialogState>
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const [form, setForm] = useState(() => {
+    if (state.mode !== 'edit') return emptyForm
+    const p = state.person
+    return {
+      fullName: p.fullName,
+      gender: (p.gender as typeof emptyForm.gender) ?? '-',
+      birthDate: p.birthDate ?? '',
+      deathDate: p.deathDate ?? '',
+      photoUrl: p.photoUrl ?? '',
+      notes: p.notes ?? '',
+    }
+  })
+  const [status, setStatus] = useState<'menikah' | 'cerai'>('menikah')
+  const [marriedDate, setMarriedDate] = useState('')
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => setErr(null), [form])
+
+  const invalidateThenClose = () => {
+    void qc.invalidateQueries({ queryKey: ['family'] })
+    onClose()
+  }
+
+  const relation = state.mode === 'create' ? state.relation : undefined
+  const isEdit = state.mode === 'edit'
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (state.mode === 'edit') {
+        await updatePerson({ data: { id: state.person.id, ...form } })
+        return
+      }
+      if (!relation) {
+        await createPerson({ data: form })
+        return
+      }
+      if (relation.kind === 'child') {
+        await createChildOf({
+          data: { ...form, parentIds: relation.parentIds ?? [relation.person.id] },
+        })
+        return
+      }
+      if (relation.kind === 'parent') {
+        await createParentOf({ data: { ...form, childId: relation.person.id } })
+        return
+      }
+      await createPartnerOf({
+        data: { ...form, personId: relation.person.id, status, marriedDate },
+      })
+    },
+    onSuccess: invalidateThenClose,
+    onError: (e) => setErr(errorMessage(e)),
+  })
+
+  const remove = useMutation({
+    mutationFn: () => deletePerson({ data: { id: (state as { person: Person }).person.id } }),
+    onSuccess: invalidateThenClose,
+    onError: (e) => setErr(errorMessage(e)),
+  })
+
+  // "Tambah Anak" pada node berpasangan otomatis menautkan kedua orangtua.
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setErr(null)
+    if (
+      form.birthDate &&
+      form.deathDate &&
+      form.deathDate < form.birthDate
+    ) {
+      setErr('Tanggal wafat tidak boleh sebelum tanggal lahir')
+      return
+    }
+    save.mutate()
+  }
+
+  const title = isEdit
+    ? 'Ubah Anggota Keluarga'
+    : relation
+      ? relation.kind === 'child'
+        ? `Tambah Anak dari ${relation.person.fullName}`
+        : relation.kind === 'parent'
+          ? `Tambah Orangtua dari ${relation.person.fullName}`
+          : `Tambah Pasangan untuk ${relation.person.fullName}`
+      : 'Tambah Anggota Keluarga'
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && !save.isPending && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? 'Perbarui data anggota keluarga ini.'
+              : 'Lengkapi data anggota keluarga baru.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={submit} className="grid gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="fullName">Nama Lengkap *</Label>
+            <Input
+              id="fullName"
+              value={form.fullName}
+              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+              placeholder="cth. Rizal Anggoro"
+              required
+              autoFocus
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-2">
+              <Label>Jenis Kelamin</Label>
+              <Select
+                value={form.gender}
+                onValueChange={(v) => setForm({ ...form, gender: v as typeof form.gender })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="-">—</SelectItem>
+                  <SelectItem value="L">Laki-laki</SelectItem>
+                  <SelectItem value="P">Perempuan</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="photoUrl">URL Foto</Label>
+              <Input
+                id="photoUrl"
+                type="url"
+                value={form.photoUrl}
+                onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
+                placeholder="https://…"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-2">
+              <Label htmlFor="birthDate">Tanggal Lahir</Label>
+              <Input
+                id="birthDate"
+                type="date"
+                value={form.birthDate}
+                onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="deathDate">Tanggal Wafat</Label>
+              <Input
+                id="deathDate"
+                type="date"
+                value={form.deathDate}
+                onChange={(e) => setForm({ ...form, deathDate: e.target.value })}
+              />
+            </div>
+          </div>
+
+          {!isEdit && relation?.kind === 'partner' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Status</Label>
+                <Select
+                  value={status}
+                  onValueChange={(v) => setStatus(v as typeof status)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="menikah">Menikah</SelectItem>
+                    <SelectItem value="cerai">Cerai</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="marriedDate">Tanggal Menikah</Label>
+                <Input
+                  id="marriedDate"
+                  type="date"
+                  value={marriedDate}
+                  onChange={(e) => setMarriedDate(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-2">
+            <Label htmlFor="notes">Catatan</Label>
+            <Textarea
+              id="notes"
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
+          </div>
+
+          {err && <p className="m-0 text-sm font-medium text-[var(--destructive)]">{err}</p>}
+
+          <DialogFooter className={isEdit ? 'sm:justify-between' : ''}>
+            {isEdit && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-[var(--destructive)] hover:text-[var(--destructive)]"
+                    disabled={remove.isPending || save.isPending}
+                  >
+                    <Trash2 size={16} /> Hapus
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Hapus anggota ini?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {(state as { person: Person }).person.fullName} akan dihapus beserta
+                      seluruh relasi orangtua–anak dan pasangannya. Tindakan ini tidak bisa
+                      dibatalkan.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => remove.mutate()}>
+                      Ya, hapus
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Batal
+              </Button>
+              <Button type="submit" disabled={save.isPending}>
+                {save.isPending ? 'Menyimpan…' : 'Simpan'}
+              </Button>
+            </div>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
