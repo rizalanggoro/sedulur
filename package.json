@@ -35,6 +35,7 @@
     "cmdk": "^1.1.1",
     "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
+    "lru-cache": "^11.5.2",
     "lucide-react": "^0.577.0",
     "nitro": "3.0.260610-beta",
     "pg": "^8.16.3",
