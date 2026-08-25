@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Search, Table2 } from 'lucide-react'
+import { Baby, Heart, Plus, Search, Table2, ArrowUp } from 'lucide-react'
 
 import { getFamily } from '#/lib/family'
 import { Button } from '#/components/ui/button'
+import {
+  PersonDialog,
+  type PersonDialogState,
+} from '#/components/family/PersonDialog'
+import type { Person } from '#/db/schema'
 
 export const Route = createFileRoute('/tabel')({ component: TabelPage })
 
@@ -15,6 +20,13 @@ function TabelPage() {
   })
   const [anchorId, setAnchorId] = useState<string | null>(null)
   const [q, setQ] = useState('')
+  const [dialog, setDialog] = useState<PersonDialogState>(null)
+  const [dialogKey, setDialogKey] = useState(0)
+
+  const openDialog = (next: PersonDialogState) => {
+    setDialog(next)
+    setDialogKey((k) => k + 1)
+  }
 
   const persons = data?.persons ?? []
   const query = q.trim().toLowerCase()
@@ -48,6 +60,14 @@ function TabelPage() {
       lahir: tahun(r.id),
     }))
   })()
+
+  // Tambah anak: sertakan pasangan acuan sebagai orangtua kedua bila ada.
+  const spouseIdOf = (person: Person) => {
+    const ps = data?.partnerships.find(
+      (x) => x.partnerAId === person.id || x.partnerBId === person.id,
+    )
+    return ps ? (ps.partnerAId === person.id ? ps.partnerBId : ps.partnerAId) : null
+  }
 
   return (
     <main className="page-wrap px-4 pb-16 pt-8">
@@ -140,6 +160,45 @@ function TabelPage() {
             </Button>
           </div>
 
+          <div className="mb-4 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() =>
+                openDialog({
+                  mode: 'create',
+                  relation: {
+                    kind: 'child',
+                    person: anchor,
+                    parentIds: [anchor.id, ...(spouseIdOf(anchor) ? [spouseIdOf(anchor)!] : [])],
+                  },
+                })
+              }
+            >
+              <Baby size={14} /> Tambah Anak
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => openDialog({ mode: 'create', relation: { kind: 'partner', person: anchor } })}
+            >
+              <Heart size={14} /> Tambah Pasangan
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => openDialog({ mode: 'create', relation: { kind: 'parent', person: anchor } })}
+            >
+              <ArrowUp size={14} /> Tambah Orang Tua
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => openDialog({ mode: 'create' })}
+            >
+              <Plus size={14} /> Anggota Baru
+            </Button>
+          </div>
+
           {rows.length === 0 ? (
             <p className="m-0 py-8 text-center text-sm text-[var(--sea-ink-soft)]">
               Belum ada relasi tercatat untuk {anchor.fullName}.
@@ -179,6 +238,15 @@ function TabelPage() {
             </div>
           )}
         </section>
+      )}
+
+      {dialog && (
+        <PersonDialog
+          key={dialogKey}
+          state={dialog}
+          persons={persons}
+          onClose={() => setDialog(null)}
+        />
       )}
     </main>
   )
