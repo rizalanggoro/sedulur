@@ -45,7 +45,27 @@ function ChildEdgeView({ id, targetX, targetY, data }: EdgeProps<ChildEdge>) {
       ? nodes.reduce((s, n) => s + centerY(n), 0) / nodes.length
       : Math.max(...nodes.map((n) => bottomY(n)))
   const midY = startY + (targetY - startY) / 2
-  const path = `M ${anchorX} ${startY} L ${anchorX} ${midY} L ${targetX} ${midY} L ${targetX} ${targetY}`
+
+  // Sudut siku dibulatkan agar aliran silsilah terlihat halus.
+  const sx = Math.sign(targetX - anchorX)
+  const r = Math.min(
+    12,
+    Math.abs(targetY - startY) / 2,
+    Math.abs(targetX - anchorX) / 2,
+  )
+  let path: string
+  if (r < 1 || sx === 0) {
+    path = `M ${anchorX} ${startY} L ${anchorX} ${midY} L ${targetX} ${midY} L ${targetX} ${targetY}`
+  } else {
+    path = [
+      `M ${anchorX} ${startY}`,
+      `L ${anchorX} ${midY - r}`,
+      `Q ${anchorX} ${midY} ${anchorX + sx * r} ${midY}`,
+      `L ${targetX - sx * r} ${midY}`,
+      `Q ${targetX} ${midY} ${targetX} ${midY + r}`,
+      `L ${targetX} ${targetY}`,
+    ].join(' ')
+  }
 
   return <BaseEdge id={id} path={path} stroke="#8fb8a8" strokeWidth={1.5} />
 }
