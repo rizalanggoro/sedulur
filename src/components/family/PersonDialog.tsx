@@ -363,18 +363,16 @@ export function PersonDialog({
           <DialogFooter className={isEdit ? 'sm:justify-between' : ''}>
             {isEdit && (
               <AlertDialog>
-                <AlertDialogTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="text-[var(--destructive)] hover:text-[var(--destructive)]"
-                      disabled={remove.isPending || save.isPending}
-                    >
-                      <Trash2 size={16} /> Hapus
-                    </Button>
-                  }
-                />
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-[var(--destructive)] hover:text-[var(--destructive)]"
+                    disabled={remove.isPending || save.isPending}
+                  >
+                    <Trash2 size={16} /> Hapus
+                  </Button>
+                </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Hapus anggota ini?</AlertDialogTitle>
