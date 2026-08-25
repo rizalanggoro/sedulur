@@ -19,10 +19,12 @@ export type FamilyData = {
 }
 
 export async function getFamilyData(): Promise<FamilyData> {
+  // ORDER BY stabil agar structural sharing TanStack Query bekerja
+  // (data identik → referensi sama → tidak memicu render ulang sia-sia)
   const [p, pl, ps] = await Promise.all([
-    db.select().from(persons),
-    db.select().from(parentLinks),
-    db.select().from(partnerships),
+    db.select().from(persons).orderBy(persons.createdAt, persons.id),
+    db.select().from(parentLinks).orderBy(parentLinks.id),
+    db.select().from(partnerships).orderBy(partnerships.id),
   ])
   return { persons: p, parentLinks: pl, partnerships: ps }
 }

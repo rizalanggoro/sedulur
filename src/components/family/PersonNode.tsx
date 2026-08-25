@@ -24,12 +24,24 @@ function years(person: PersonNode['data']['person']) {
   return birth ?? (death ? `wafat ${death}` : null) // masih hidup: tahun lahir saja
 }
 
+function spouseBadgeLabel(p: PersonNode['data']['person']) {
+  return p.gender === 'P' ? 'Istri' : p.gender === 'L' ? 'Suami' : 'Pasangan'
+}
+
 export function PersonNode({ data, selected }: NodeProps<PersonNode>) {
-  const { person, onAction } = data
+  const { person, onAction, spouseOrder } = data
   const lifeYears = years(person)
 
   return (
     <div className="group relative" style={{ width: 224, height: 96 }}>
+      {spouseOrder && (
+        <div
+          title={`${spouseBadgeLabel(person)} ke-${spouseOrder.rank} dari ${spouseOrder.total}`}
+          className="absolute -left-2 -top-2 z-[1] flex h-6 w-6 items-center justify-center rounded-full bg-[#d66f9e] text-[11px] font-bold text-white shadow"
+        >
+          {spouseOrder.rank}
+        </div>
+      )}
       {data.birthOrder && (
         <div
           title={`Anak ke-${data.birthOrder.rank} dari ${data.birthOrder.total} bersaudara`}

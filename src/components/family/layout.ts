@@ -2,14 +2,13 @@ import Dagre from '@dagrejs/dagre'
 import type { Edge, Node } from '@xyflow/react'
 
 import type { FamilyData } from '#/lib/family'
-import type { Person } from '#/db/schema'
+import type { Partnership, Person } from '#/db/schema'
 
 export const CARD_W = 224
 export const CARD_H = 96
 
-const SPOUSE_GAP = 48
-const UNIT_GAP = 64
 const RANK_GAP = 110
+const NODE_GAP = 56
 
 export type NodeActionKind = 'view' | 'edit' | 'child' | 'partner' | 'parent'
 export type NodeActionHandler = (
@@ -19,6 +18,9 @@ export type NodeActionHandler = (
 
 /** Urutan kelahiran di antara saudara sekandang. */
 export type BirthOrder = { rank: number; total: number }
+
+/** Urutan pernikahan seorang pasangan (konteks: pasangan yang menikah >1 kali). */
+export type SpouseOrder = { rank: number; total: number }
 
 /** Kelompokkan saudara sekandang, terurut tanggal lahir (fallback: urutan data). */
 export function groupSiblings(
@@ -52,21 +54,56 @@ export function computeBirthOrders(
   return orders
 }
 
+/**
+ * Peringkat pernikahan tiap orang yang menikah >1 kali:
+ * hub -> (partnershipId -> nomor urut). Urutan: tanggal menikah, lalu urutan data.
+ */
+export function computeMarriageRanks(partnerships: Partnership[]): {
+  degree: Map<string, number>
+  rankByHub: Map<string, Map<string, SpouseOrder>>
+} {
+  const degree = new Map<string, number>()
+  for (const ps of partnerships) {
+    degree.set(ps.partnerAId, (degree.get(ps.partnerAId) ?? 0) + 1)
+    degree.set(ps.partnerBId, (degree.get(ps.partnerBId) ?? 0) + 1)
+  }
+  const rankByHub = new Map<string, Map<string, SpouseOrder>>()
+  const lists = new Map<string, { psId: string; key: string }[]>()
+  partnerships.forEach((ps, i) => {
+    for (const pid of [ps.partnerAId, ps.partnerBId]) {
+      if ((degree.get(pid) ?? 0) <= 1) continue
+      ;(lists.get(pid) ?? lists.set(pid, []).get(pid)!).push({
+        psId: ps.id,
+        key: ps.marriedDate ?? String(i).padStart(6, '0'),
+      })
+    }
+  })
+  for (const [hub, list] of lists) {
+    list.sort((a, b) => a.key.localeCompare(b.key))
+    rankByHub.set(
+      hub,
+      new Map(list.map((item, i) => [item.psId, { rank: i + 1, total: list.length }])),
+    )
+  }
+  return { degree, rankByHub }
+}
+
 export type PersonFlowData = {
   person: Person
   birthOrder?: BirthOrder
+  /** Urutan pernikahan pasangan ini (untuk badge "Istri/Suami ke-N"). */
+  spouseOrder?: SpouseOrder
   onAction?: NodeActionHandler
 }
-export type ChildEdgeData = { anchorIds: string[] }
 
 export type PersonNode = Node<PersonFlowData, 'person'>
-export type ChildEdge = Edge<ChildEdgeData, 'child'>
 
 /**
  * Transform data DB menjadi nodes/edges React Flow.
- * Pasangan digabung menjadi satu "unit" saat layout dagre (top-to-bottom),
- * lalu diposisikan berdampingan. Anak menggantung dari titik tengah unit
- * orangtuanya (lihat ChildEdge).
+ *
+ * Model hierarki: istri berada DI BAWAH suami (garis pernikahan vertikal),
+ * dan anak menggantung di bawah IBU-nya (garis lurus satu jangkar).
+ * Setiap orang tepat satu kartu; jumlah istri tidak mempengaruhi geometri.
  */
 export function layoutFamily(
   data: FamilyData,
@@ -78,165 +115,123 @@ export function layoutFamily(
   const { persons, parentLinks, partnerships } = data
   if (persons.length === 0) return { nodes: [], edges: [] }
 
-  // Union-find: setiap pasangan (dan rantai pernikahan) jadi satu unit
-  const parentOf = new Map<string, string>()
-  for (const p of persons) parentOf.set(p.id, p.id)
-  const find = (id: string): string => {
-    let root = id
-    while (parentOf.get(root) !== root) root = parentOf.get(root)!
-    while (parentOf.get(id) !== root) {
-      const next = parentOf.get(id)!
-      parentOf.set(id, root)
-      id = next
-    }
-    return root
-  }
-  const union = (a: string, b: string) => {
-    parentOf.set(find(a), find(b))
-  }
-
-  const partnersOf = new Map<string, string[]>()
-  for (const ps of partnerships) {
-    union(ps.partnerAId, ps.partnerBId)
-    ;(partnersOf.get(ps.partnerAId) ?? partnersOf.set(ps.partnerAId, []).get(ps.partnerAId)!).push(
-      ps.partnerBId,
-    )
-    ;(partnersOf.get(ps.partnerBId) ?? partnersOf.set(ps.partnerBId, []).get(ps.partnerBId)!).push(
-      ps.partnerAId,
-    )
-  }
-
-  const unitsMap = new Map<string, string[]>()
-  for (const p of persons) {
-    const root = find(p.id)
-    ;(unitsMap.get(root) ?? unitsMap.set(root, []).get(root)!).push(p.id)
-  }
-
-  // Urutkan anggota unit agar pasangan selalu bersebelahan
-  const orderedUnits = new Map<string, string[]>()
-  for (const [root, members] of unitsMap) {
-    const placed = new Set<string>()
-    const out: string[] = []
-    const walk = (id: string) => {
-      if (placed.has(id)) return
-      placed.add(id)
-      out.push(id)
-      for (const partner of partnersOf.get(id) ?? []) {
-        if (members.includes(partner)) walk(partner)
-      }
-    }
-    for (const m of members) walk(m)
-    out.push(...members.filter((m) => !placed.has(m)))
-    orderedUnits.set(root, out)
-  }
-
-  // Layout dagre pada level unit
-  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: 'TB', nodesep: UNIT_GAP, ranksep: RANK_GAP })
-  for (const [root, members] of orderedUnits) {
-    g.setNode(root, {
-      width: members.length * CARD_W + (members.length - 1) * SPOUSE_GAP,
-      height: CARD_H,
-    })
-  }
-  const seenUnitEdges = new Set<string>()
-  for (const link of parentLinks) {
-    const from = find(link.parentId)
-    const to = find(link.childId)
-    if (!g.hasNode(from) || !g.hasNode(to) || from === to) continue
-    const key = `${from}->${to}`
-    if (seenUnitEdges.has(key)) continue
-    seenUnitEdges.add(key)
-    g.setEdge(from, to)
-  }
-  Dagre.layout(g)
-
   const byIndex = new Map(persons.map((p) => [p.id, p]))
+
   const parentsByChild = new Map<string, string[]>()
   for (const link of parentLinks) {
     ;(parentsByChild.get(link.childId) ??
       parentsByChild.set(link.childId, []).get(link.childId)!).push(link.parentId)
   }
 
-  // Posisi unit dari dagre (top-left)
-  const unitBox = new Map<string, { x: number; y: number }>()
-  for (const [root] of orderedUnits) {
-    const n = g.node(root)
-    unitBox.set(root, { x: n.x - n.width / 2, y: n.y - CARD_H / 2 })
+  // Ibu utama anak: orangtua berjenis kelamin P, fallback orangtua pertama.
+  const motherOf = (parents: string[]): string | undefined => {
+    const valid = parents.filter((p) => byIndex.has(p))
+    return valid.find((p) => byIndex.get(p)?.gender === 'P') ?? valid[0]
+  }
+  // Sumber garis pernikahan:
+  // 1) Person yang sudah berakar di pohon (punya orangtua) di atas —
+  //    pasangan bebas menggantung di bawahnya, tidak masuk baris istri lain.
+  // 2) Fallback: suami (L) di atas istri (P).
+  const spouseSourceOf = (ps: Partnership): string => {
+    const aRooted = parentsByChild.has(ps.partnerAId)
+    const bRooted = parentsByChild.has(ps.partnerBId)
+    if (aRooted !== bRooted) return aRooted ? ps.partnerAId : ps.partnerBId
+    const ga = byIndex.get(ps.partnerAId)?.gender
+    const gb = byIndex.get(ps.partnerBId)?.gender
+    if (gb === 'P' && ga !== 'P') return ps.partnerAId
+    if (ga === 'P' && gb !== 'P') return ps.partnerBId
+    return ps.partnerAId
   }
 
-  // Anak ke-N menentukan urutan kiri→kanan: tukar slot-x di dalam grup saudara.
-  // Hanya memutar posisi antar anggota grup, jadi tidak mungkin bertumpuk.
-  for (const grp of groupSiblings(parentsByChild, byIndex)) {
-    const childUnits = grp.map((m) => ({ key: m.key, root: find(m.id) }))
-    if (new Set(childUnits.map((c) => c.root)).size !== childUnits.length) continue
-    const slots = childUnits
-      .map((c) => unitBox.get(c.root)!.x)
-      .sort((a, b) => a - b)
-    ;[...childUnits]
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .forEach((cu, i) => {
-        unitBox.get(cu.root)!.x = slots[i]
-      })
-  }
+  // ---------- Layout dagre langsung pada person ----------
+  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
+  g.setGraph({ rankdir: 'TB', nodesep: NODE_GAP, ranksep: RANK_GAP })
+  for (const p of persons) g.setNode(p.id, { width: CARD_W, height: CARD_H })
 
-  // Posisi person di dalam unit-nya
-  const posById = new Map<string, { x: number; y: number }>()
-  for (const [root, members] of orderedUnits) {
-    const box = unitBox.get(root)!
-    let x = box.x
-    for (const id of members) {
-      posById.set(id, { x, y: box.y })
-      x += CARD_W + SPOUSE_GAP
-    }
-  }
-  const orders = computeBirthOrders(parentsByChild, byIndex)
-  const nodes: PersonNode[] = persons.map((p) => ({
-    id: p.id,
-    type: 'person',
-    position: posById.get(p.id)!,
-    data: { person: p, birthOrder: orders.get(p.id), onAction },
-  }))
-
-  const edges: Edge[] = []
-
-  // Garis pasangan (horizontal antar kartu yang bersebelahan)
+  const seenPair = new Set<string>()
   for (const ps of partnerships) {
-    const a = posById.get(ps.partnerAId)
-    const b = posById.get(ps.partnerBId)
-    if (!a || !b) continue
-    const aIdx = orderedUnits.get(find(ps.partnerAId))!.indexOf(ps.partnerAId)
-    const bIdx = orderedUnits.get(find(ps.partnerAId))!.indexOf(ps.partnerBId)
-    if (Math.abs(aIdx - bIdx) !== 1) continue
-    const [left, right] = a.x < b.x ? [ps.partnerAId, ps.partnerBId] : [ps.partnerBId, ps.partnerAId]
+    const s = spouseSourceOf(ps)
+    const t = s === ps.partnerAId ? ps.partnerBId : ps.partnerAId
+    if (!byIndex.has(s) || !byIndex.has(t) || s === t) continue
+    const key = `${s}->${t}`
+    if (seenPair.has(key)) continue
+    seenPair.add(key)
+    g.setEdge(s, t)
+  }
+  for (const [childId, parents] of parentsByChild) {
+    const m = motherOf(parents)
+    if (m && byIndex.has(childId) && m !== childId) g.setEdge(m, childId)
+  }
+  Dagre.layout(g)
+
+  // Posisi person (top-left)
+  const posById = new Map<string, { x: number; y: number }>()
+  for (const p of persons) {
+    const n = g.node(p.id)
+    posById.set(p.id, { x: n.x - CARD_W / 2, y: n.y - CARD_H / 2 })
+  }
+
+  const { degree, rankByHub } = computeMarriageRanks(partnerships)
+
+  // ---------- Nodes ----------
+  const orders = computeBirthOrders(parentsByChild, byIndex)
+  const nodes: PersonNode[] = persons.map((p) => {
+    let spouseOrder: SpouseOrder | undefined
+    for (const ps of partnerships) {
+      if (ps.partnerAId !== p.id && ps.partnerBId !== p.id) continue
+      const other = ps.partnerAId === p.id ? ps.partnerBId : ps.partnerAId
+      if ((degree.get(other) ?? 0) > 1) {
+        const r = rankByHub.get(other)?.get(ps.id)
+        if (r) {
+          spouseOrder = r
+          break
+        }
+      }
+    }
+    return {
+      id: p.id,
+      type: 'person',
+      position: posById.get(p.id)!,
+      data: { person: p, birthOrder: orders.get(p.id), spouseOrder, onAction },
+    }
+  })
+
+  // ---------- Edges ----------
+  const edges: Edge[] = []
+  const styleOf = (status: string) =>
+    status === 'cerai'
+      ? { stroke: '#b0aca6', strokeWidth: 2, strokeDasharray: '6 4' }
+      : { stroke: '#d66f9e', strokeWidth: 2 }
+
+  // Garis pernikahan: bezier dari bawah suami/berakar ke atas pasangannya
+  for (const ps of partnerships) {
+    const s = spouseSourceOf(ps)
+    const t = s === ps.partnerAId ? ps.partnerBId : ps.partnerAId
+    if (!posById.has(s) || !posById.has(t) || s === t) continue
     edges.push({
       id: `ps:${ps.id}`,
-      source: left,
-      target: right,
-      sourceHandle: 'r',
-      targetHandle: 'l',
-      type: 'straight',
-      style:
-        ps.status === 'cerai'
-          ? { stroke: '#b0aca6', strokeWidth: 2, strokeDasharray: '6 4' }
-          : { stroke: '#d98e4a', strokeWidth: 2 },
+      source: s,
+      target: t,
+      sourceHandle: 'b',
+      targetHandle: 't',
+      type: 'default',
+      style: styleOf(ps.status),
     })
   }
 
-  // Garis ke anak: satu garis dari titik tengah para orangtua
+  // Garis anak: bezier dari bawah ibu ke atas anak
   for (const [childId, parents] of parentsByChild) {
     if (!byIndex.has(childId)) continue
-    const source = parents.find((p) => posById.has(p))
-    if (!source) continue
+    const anchor = motherOf(parents)
+    if (!anchor) continue
     edges.push({
       id: `pc:${childId}`,
-      source,
+      source: anchor,
       target: childId,
       sourceHandle: 'b',
       targetHandle: 't',
-      type: 'child',
-      data: { anchorIds: parents.filter((p) => posById.has(p)) },
-    } as Edge)
+      type: 'default',
+    })
   }
 
   return { nodes, edges }
