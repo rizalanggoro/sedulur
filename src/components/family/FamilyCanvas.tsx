@@ -64,7 +64,7 @@ function FlowInner({
         if (!next) {
           window.dispatchEvent(new CustomEvent('sedulur:deselect'))
         } else {
-          void fitView({ nodes: [{ id: next }], duration: 300, maxZoom: 1, padding: 0.7 })
+          void fitView({ nodes: [{ id: next }], duration: 300, maxZoom: 1.25, padding: 0.9 })
         }
         return next
       })

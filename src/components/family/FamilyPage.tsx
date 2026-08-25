@@ -26,6 +26,22 @@ export function FamilyPage() {
   const [dialog, setDialog] = useState<PersonDialogState>(null)
   const [dialogKey, setDialogKey] = useState(0)
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [closing, setClosing] = useState(false)
+  const closingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const closeDetail = useCallback(() => {
+    setClosing(true)
+    closingTimerRef.current = setTimeout(() => {
+      setDetailId(null)
+      setClosing(false)
+    }, 300)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (closingTimerRef.current) clearTimeout(closingTimerRef.current)
+    }
+  }, [])
 
   const openDialog = (next: PersonDialogState) => {
     setDialog(next)
@@ -73,10 +89,10 @@ export function FamilyPage() {
   )
 
   useEffect(() => {
-    const handler = () => setDetailId(null)
+    const handler = () => closeDetail()
     window.addEventListener('sedulur:deselect', handler)
     return () => window.removeEventListener('sedulur:deselect', handler)
-  }, [])
+  }, [closeDetail])
 
   const isEmpty = !isPending && data !== undefined && data.persons.length === 0
 
@@ -128,20 +144,23 @@ export function FamilyPage() {
         />
       )}
 
-      {detailId && (
+      {(detailId || closing) && (
         <DetailPanel
+          key={detailId ?? closing ? 'open' : 'closed'}
           person={data?.persons.find((p) => p.id === detailId)}
           family={data ?? null}
           onEdit={(p) => handleNodeAction('edit', p)}
-          onClose={() => setDetailId(null)}
+          onClose={closeDetail}
           onFocusPerson={(id) => {
             setDetailId(id)
+            setClosing(false)
             window.dispatchEvent(new CustomEvent('sedulur:focus-person', { detail: id }))
           }}
           onLinkParent={async (parentId, childId) => {
             await linkParentToChild({ data: { parentId, childId } })
             await qc.invalidateQueries({ queryKey: ['family'] })
           }}
+          closing={closing}
         />
       )}
     </TreeShell>
@@ -167,6 +186,7 @@ function DetailPanel({
   onClose,
   onFocusPerson,
   onLinkParent,
+  closing = false,
 }: {
   person?: Person
   family: { persons: Person[]; parentLinks: ParentLink[]; partnerships: Partnership[] } | null
@@ -174,6 +194,7 @@ function DetailPanel({
   onClose: () => void
   onFocusPerson: (id: string) => void
   onLinkParent?: (parentId: string, childId: string) => Promise<void>
+  closing?: boolean
 }) {
   const [linkPending, setLinkPending] = useState(false)
   if (!person || !family) return null
@@ -215,7 +236,10 @@ function DetailPanel({
   }
 
   return (
-    <aside className="absolute right-4 top-4 z-20 max-h-[calc(100%-2rem)] w-80 overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-xl backdrop-blur">
+    <aside
+      className="absolute right-4 top-4 z-20 max-h-[calc(100%-2rem)] w-80 overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-xl backdrop-blur"
+      style={{ animation: closing ? 'detail-slide-out 300ms ease-in forwards' : 'detail-slide-in 300ms ease-out' }}
+    >
       <div className="mb-4 flex items-start justify-between gap-2">
         <div className="flex items-center gap-3">
           {person.photoUrl ? (
