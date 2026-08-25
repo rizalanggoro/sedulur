@@ -40,7 +40,7 @@ export function PersonNode({ data, selected }: NodeProps<PersonNode>) {
           borderLeftColor: genderAccent[person.gender] ?? genderAccent['-'],
           borderLeftWidth: 4,
         }}
-        onClick={() => onAction?.('edit', person)}
+        onClick={() => onAction?.('view', person)}
       >
         {person.photoUrl ? (
           <img

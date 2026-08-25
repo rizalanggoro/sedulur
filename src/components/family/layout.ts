@@ -11,7 +11,7 @@ const SPOUSE_GAP = 48
 const UNIT_GAP = 64
 const RANK_GAP = 110
 
-export type NodeActionKind = 'edit' | 'child' | 'partner' | 'parent'
+export type NodeActionKind = 'view' | 'edit' | 'child' | 'partner' | 'parent'
 export type NodeActionHandler = (
   kind: NodeActionKind,
   person: Person,
@@ -155,8 +155,8 @@ export function layoutFamily(
       type: 'straight',
       style:
         ps.status === 'cerai'
-          ? { stroke: '#b0aca6', strokeWidth: 1.5, strokeDasharray: '6 4' }
-          : { stroke: '#8fb8a8', strokeWidth: 2 },
+          ? { stroke: '#b0aca6', strokeWidth: 2, strokeDasharray: '6 4' }
+          : { stroke: '#d98e4a', strokeWidth: 2 },
     })
   }
 

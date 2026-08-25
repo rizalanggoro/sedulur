@@ -361,4 +361,7 @@ a {
     transparent
   );
   --xy-attribution-background-color: transparent;
+  /* Semua edge 2px; anak hijau lagoon, pasangan amber via inline style */
+  --xy-edge-stroke: #8fb8a8;
+  --xy-edge-stroke-width: 2px;
 }

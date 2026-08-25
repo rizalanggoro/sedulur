@@ -67,7 +67,8 @@ function ChildEdgeView({ id, targetX, targetY, data }: EdgeProps<ChildEdge>) {
     ].join(' ')
   }
 
-  return <BaseEdge id={id} path={path} stroke="#8fb8a8" strokeWidth={1.5} />
+  // Warna & tebal garis dikendalikan variabel CSS --xy-edge-* (styles.css)
+  return <BaseEdge id={id} path={path} />
 }
 
 const edgeTypes = { child: ChildEdgeView }
@@ -129,14 +130,14 @@ export function FamilyCanvas({
 
   if (!ready) {
     return (
-      <div className="flex h-full w-full items-center justify-center rounded-3xl border border-[var(--line)] bg-[var(--foam)] text-sm text-[var(--sea-ink-soft)]">
+      <div className="flex h-full w-full items-center justify-center bg-[var(--foam)] text-sm text-[var(--sea-ink-soft)]">
         Memuat silsilah…
       </div>
     )
   }
 
   return (
-    <div className="h-full w-full overflow-hidden rounded-3xl border border-[var(--line)] bg-[var(--foam)]">
+    <div className="h-full w-full overflow-hidden bg-[var(--foam)]">
       <ReactFlowProvider>
         <FlowInner nodes={nodes} edges={edges} />
       </ReactFlowProvider>

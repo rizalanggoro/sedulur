@@ -1,4 +1,9 @@
+import { useRouterState } from '@tanstack/react-router'
+
 export default function Footer() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  if (pathname === '/') return null
+
   const year = new Date().getFullYear()
 
   return (

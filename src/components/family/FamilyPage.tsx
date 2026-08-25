@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Users } from 'lucide-react'
+import { Pencil, Plus, Users, X } from 'lucide-react'
 
 import { getFamily } from '#/lib/family'
+import type { ParentLink, Partnership, Person } from '#/db/schema'
 import { layoutFamily } from './layout'
 import type { NodeActionHandler } from './layout'
 import { FamilyCanvas } from './FamilyCanvas'
@@ -17,6 +18,7 @@ export function FamilyPage() {
 
   const [dialog, setDialog] = useState<PersonDialogState>(null)
   const [dialogKey, setDialogKey] = useState(0)
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   const openDialog = (next: PersonDialogState) => {
     setDialog(next)
@@ -29,7 +31,12 @@ export function FamilyPage() {
   const handleNodeAction = useCallback<NodeActionHandler>((kind, person) => {
     const d = dataRef.current
     if (!d) return
+    if (kind === 'view') {
+      setDetailId(person.id)
+      return
+    }
     if (kind === 'edit') {
+      setDetailId(null)
       openDialog({ mode: 'edit', person })
       return
     }
@@ -117,11 +124,165 @@ export function FamilyPage() {
           onClose={() => setDialog(null)}
         />
       )}
+
+      {detailId && (
+        <DetailPanel
+          person={data?.persons.find((p) => p.id === detailId)}
+          family={data ?? null}
+          onEdit={(p) => handleNodeAction('edit', p)}
+          onClose={() => setDetailId(null)}
+        />
+      )}
     </TreeShell>
   )
 }
 
-/** Kontainer setinggi viewport dikurangi header & footer aplikasi. */
+const BULAN = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+]
+
+function formatTanggal(iso: string | null | undefined) {
+  if (!iso) return null
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return iso
+  return `${d} ${BULAN[m - 1]} ${y}`
+}
+
+function DetailPanel({
+  person,
+  family,
+  onEdit,
+  onClose,
+}: {
+  person?: Person
+  family: { persons: Person[]; parentLinks: ParentLink[]; partnerships: Partnership[] } | null
+  onEdit: (p: Person) => void
+  onClose: () => void
+}) {
+  if (!person || !family) return null
+
+  const nama = (id: string) => family.persons.find((p) => p.id === id)?.fullName ?? '—'
+  const ortu = family.parentLinks.filter((l) => l.childId === person.id)
+  const anak = family.parentLinks.filter((l) => l.parentId === person.id)
+  const pasangan = family.partnerships
+    .filter((ps) => ps.partnerAId === person.id || ps.partnerBId === person.id)
+    .map((ps) => ({
+      orang: ps.partnerAId === person.id ? ps.partnerBId : ps.partnerAId,
+      status: ps.status,
+    }))
+
+  const lahir = formatTanggal(person.birthDate)
+  const wafat = formatTanggal(person.deathDate)
+
+  return (
+    <aside className="absolute right-4 top-4 z-20 max-h-[calc(100%-2rem)] w-80 overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-5 shadow-xl backdrop-blur">
+      <div className="mb-4 flex items-start justify-between gap-2">
+        <div className="flex items-center gap-3">
+          {person.photoUrl ? (
+            <img
+              src={person.photoUrl}
+              alt={person.fullName}
+              className="h-14 w-14 rounded-full border border-[var(--line)] object-cover"
+            />
+          ) : (
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--sand)] text-base font-bold text-[var(--palm)]">
+              {person.fullName.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')}
+            </div>
+          )}
+          <div>
+            <h3 className="m-0 text-base font-bold leading-tight text-[var(--sea-ink)]">
+              {person.fullName}
+            </h3>
+            <p className="m-0 text-xs text-[var(--sea-ink-soft)]">
+              {person.gender === 'L' ? 'Laki-laki' : person.gender === 'P' ? 'Perempuan' : '—'}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label="Tutup"
+          onClick={onClose}
+          className="rounded-full p-1.5 text-[var(--sea-ink-soft)] transition hover:bg-[var(--sand)] hover:text-[var(--sea-ink)]"
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      <dl className="m-0 grid gap-1 text-sm">
+        {lahir && (
+          <div className="flex gap-2">
+            <dt className="w-16 flex-shrink-0 text-[var(--sea-ink-soft)]">Lahir</dt>
+            <dd className="m-0 font-medium text-[var(--sea-ink)]">{lahir}</dd>
+          </div>
+        )}
+        {wafat && (
+          <div className="flex gap-2">
+            <dt className="w-16 flex-shrink-0 text-[var(--sea-ink-soft)]">Wafat</dt>
+            <dd className="m-0 font-medium text-[var(--sea-ink)]">{wafat}</dd>
+          </div>
+        )}
+      </dl>
+
+      {(ortu.length > 0 || pasangan.length > 0 || anak.length > 0) && (
+        <div className="mt-4 grid gap-2 border-t border-[var(--line)] pt-4 text-sm">
+          {ortu.length > 0 && (
+            <div>
+              <p className="island-kicker m-0 mb-1 text-xs">Orangtua</p>
+              <ul className="m-0 list-none space-y-0.5 p-0 text-[var(--sea-ink)]">
+                {ortu.map((l) => (
+                  <li key={l.id}>{nama(l.parentId)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {pasangan.length > 0 && (
+            <div>
+              <p className="island-kicker m-0 mb-1 text-xs">Pasangan</p>
+              <ul className="m-0 list-none space-y-0.5 p-0 text-[var(--sea-ink)]">
+                {pasangan.map((ps, i) => (
+                  <li key={i}>
+                    {nama(ps.orang)}
+                    <span className="text-xs text-[var(--sea-ink-soft)]">
+                      {' '}
+                      ({ps.status === 'cerai' ? 'cerai' : 'menikah'})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {anak.length > 0 && (
+            <div>
+              <p className="island-kicker m-0 mb-1 text-xs">Anak</p>
+              <ul className="m-0 list-none space-y-0.5 p-0 text-[var(--sea-ink)]">
+                {anak.map((l) => (
+                  <li key={l.id}>{nama(l.childId)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {person.notes && (
+        <p className="mb-0 mt-4 whitespace-pre-wrap rounded-xl bg-[var(--foam)] p-3 text-sm leading-relaxed text-[var(--sea-ink-soft)]">
+          {person.notes}
+        </p>
+      )}
+
+      <Button
+        variant="outline"
+        className="mt-4 w-full"
+        onClick={() => onEdit(person)}
+      >
+        <Pencil size={14} /> Ubah Data
+      </Button>
+    </aside>
+  )
+}
+
+/** Kontainer kanvas memenuhi seluruh layar di bawah header. */
 function TreeShell({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -130,8 +291,7 @@ function TreeShell({ children }: { children: React.ReactNode }) {
     if (!el) return
     const calc = () => {
       const header = document.querySelector('header')?.getBoundingClientRect().height ?? 0
-      const footer = document.querySelector('footer')?.getBoundingClientRect().height ?? 0
-      el.style.height = `calc(100dvh - ${Math.round(header + footer)}px)`
+      el.style.height = `calc(100dvh - ${Math.round(header)}px)`
     }
     calc()
     window.addEventListener('resize', calc)
@@ -139,7 +299,7 @@ function TreeShell({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <main className="page-wrap relative w-full px-4 pb-0 pt-4" ref={ref}>
+    <main className="relative w-full overflow-hidden" ref={ref}>
       {children}
     </main>
   )
