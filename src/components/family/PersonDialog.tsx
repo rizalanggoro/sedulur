@@ -203,7 +203,7 @@ export function PersonDialog({
               <Label>Orangtua Kedua (opsional)</Label>
               <Select
                 value={secondParent}
-                onValueChange={(v) => setSecondParent(v === ' ' ? '' : v)}
+                onValueChange={(v) => setSecondParent(v === ' ' || v === null ? '' : v)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="— Tidak ada —" />
@@ -231,7 +231,7 @@ export function PersonDialog({
               <Label>Pasangan</Label>
               <Select
                 value={existingPartner}
-                onValueChange={(v) => setExistingPartner(v === ' ' ? '' : v)}
+                onValueChange={(v) => setExistingPartner(v === ' ' || v === null ? '' : v)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="— Buat anggota baru —" />
@@ -363,16 +363,18 @@ export function PersonDialog({
           <DialogFooter className={isEdit ? 'sm:justify-between' : ''}>
             {isEdit && (
               <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="text-[var(--destructive)] hover:text-[var(--destructive)]"
-                    disabled={remove.isPending || save.isPending}
-                  >
-                    <Trash2 size={16} /> Hapus
-                  </Button>
-                </AlertDialogTrigger>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="text-[var(--destructive)] hover:text-[var(--destructive)]"
+                      disabled={remove.isPending || save.isPending}
+                    >
+                      <Trash2 size={16} /> Hapus
+                    </Button>
+                  }
+                />
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Hapus anggota ini?</AlertDialogTitle>
