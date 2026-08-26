@@ -42,6 +42,14 @@ import {
   SelectValue,
 } from '#/components/ui/select'
 import { Textarea } from '#/components/ui/textarea'
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '#/components/ui/combobox'
 
 export type DialogRelation = {
   kind: 'child' | 'parent' | 'partner'
@@ -186,8 +194,9 @@ export function PersonDialog({
       : 'Tambah Anggota Keluarga'
 
   return (
-    <Dialog open onOpenChange={(open) => !open && !save.isPending && onClose()}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open modal={false} onOpenChange={(open) => !open && !save.isPending && onClose()}>
+      <div className="fixed inset-0 z-50 bg-black/10 supports-backdrop-filter:backdrop-blur-xs" aria-hidden="true" />
+      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -201,24 +210,26 @@ export function PersonDialog({
           {relation?.kind === 'child' && (
             <div className="grid gap-2">
               <Label>Orangtua Kedua (opsional)</Label>
-              <Select
+              <Combobox
+                items={['', ...persons.filter((p) => p.id !== relation.person.id).map((p) => p.id)]}
                 value={secondParent}
-                onValueChange={(v) => setSecondParent(v === ' ' || v === null ? '' : v)}
+                onValueChange={(v) => setSecondParent(v ?? '')}
+                itemToStringLabel={(id) =>
+                  id === '' ? 'Tidak ada' : persons.find((p) => p.id === id)?.fullName ?? ''
+                }
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="— Tidak ada —" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value=" ">— Tidak ada —</SelectItem>
-                  {persons
-                    .filter((p) => p.id !== relation.person.id)
-                    .map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.fullName}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                <ComboboxInput placeholder="Cari nama…" />
+                <ComboboxContent>
+                  <ComboboxEmpty>Tidak ditemukan.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(id: string) => (
+                      <ComboboxItem key={id} value={id}>
+                        {id === '' ? '— Tidak ada —' : persons.find((p) => p.id === id)?.fullName}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
               <p className="m-0 text-xs text-[var(--sea-ink-soft)]">
                 Pilih pasangan dari {relation.person.fullName} agar anak tertaut ke
                 ayah &amp; ibu sekaligus.
@@ -229,24 +240,26 @@ export function PersonDialog({
           {relation?.kind === 'partner' && (
             <div className="grid gap-2">
               <Label>Pasangan</Label>
-              <Select
+              <Combobox
+                items={['', ...persons.filter((p) => p.id !== relation.person.id).map((p) => p.id)]}
                 value={existingPartner}
-                onValueChange={(v) => setExistingPartner(v === ' ' || v === null ? '' : v)}
+                onValueChange={(v) => setExistingPartner(v ?? '')}
+                itemToStringLabel={(id) =>
+                  id === '' ? 'Buat anggota baru' : persons.find((p) => p.id === id)?.fullName ?? ''
+                }
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="— Buat anggota baru —" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value=" ">— Buat anggota baru —</SelectItem>
-                  {persons
-                    .filter((p) => p.id !== relation.person.id)
-                    .map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.fullName}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                <ComboboxInput placeholder="Cari nama…" />
+                <ComboboxContent>
+                  <ComboboxEmpty>Tidak ditemukan.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(id: string) => (
+                      <ComboboxItem key={id} value={id}>
+                        {id === '' ? '— Buat anggota baru —' : persons.find((p) => p.id === id)?.fullName}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
               <p className="m-0 text-xs text-[var(--sea-ink-soft)]">
                 Sudah ada datanya? Pilih nama di atas untuk menautkan langsung.
               </p>
