@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { Edge } from '@xyflow/react'
 import { Pencil, Plus, Users, X } from 'lucide-react'
 
 import { getFamily, linkParentToChild } from '#/lib/family'
 import type { ParentLink, Partnership, Person } from '#/db/schema'
-import { layoutFamily, computeBirthOrders } from './layout'
+import { layoutFamily, computeBirthOrders, type PersonNode } from './layout'
 import type { NodeActionHandler } from './layout'
 import { FamilyCanvas } from './FamilyCanvas'
 import { PersonDialog, type PersonDialogState } from './PersonDialog'
@@ -83,10 +84,20 @@ export function FamilyPage() {
     openDialog({ mode: 'create', relation: { kind, person } })
   }, [])
 
-  const { nodes, edges } = useMemo(
-    () => (data ? layoutFamily(data, handleNodeAction) : { nodes: [], edges: [] }),
-    [data, handleNodeAction],
-  )
+  const [flowNodes, setFlowNodes] = useState<PersonNode[]>([])
+  const [flowEdges, setFlowEdges] = useState<Edge[]>([])
+
+  useEffect(() => {
+    if (!data) return
+    let cancelled = false
+    layoutFamily(data, handleNodeAction).then(({ nodes, edges }) => {
+      if (!cancelled) {
+        setFlowNodes(nodes)
+        setFlowEdges(edges)
+      }
+    })
+    return () => { cancelled = true }
+  }, [data, handleNodeAction])
 
   useEffect(() => {
     const handler = () => closeDetail()
@@ -132,7 +143,7 @@ export function FamilyPage() {
       )}
 
       {!isPending && !isError && !isEmpty && (
-        <FamilyCanvas nodes={nodes} edges={edges} />
+        <FamilyCanvas nodes={flowNodes} edges={flowEdges} />
       )}
 
       {dialog && (

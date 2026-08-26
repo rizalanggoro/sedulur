@@ -1,4 +1,4 @@
-import Dagre from '@dagrejs/dagre'
+import { tree as d3tree, hierarchy, type HierarchyPointNode } from 'd3-hierarchy'
 import type { Edge, Node } from '@xyflow/react'
 
 import type { FamilyData } from '#/lib/family'
@@ -98,20 +98,15 @@ export type PersonFlowData = {
 
 export type PersonNode = Node<PersonFlowData, 'person'>
 
-/**
- * Transform data DB menjadi nodes/edges React Flow.
- *
- * Model hierarki: istri berada DI BAWAH suami (garis pernikahan vertikal),
- * dan anak menggantung di bawah IBU-nya (garis lurus satu jangkar).
- * Setiap orang tepat satu kartu; jumlah istri tidak mempengaruhi geometri.
- */
-export function layoutFamily(
+type TreeNode = { id: string; children: TreeNode[] }
+
+export async function layoutFamily(
   data: FamilyData,
   onAction?: PersonFlowData['onAction'],
-): {
+): Promise<{
   nodes: PersonNode[]
   edges: Edge[]
-} {
+}> {
   const { persons, parentLinks, partnerships } = data
   if (persons.length === 0) return { nodes: [], edges: [] }
 
@@ -123,10 +118,6 @@ export function layoutFamily(
       parentsByChild.set(link.childId, []).get(link.childId)!).push(link.parentId)
   }
 
-  // Sumber garis pernikahan:
-  // 1) Person yang sudah berakar di pohon (punya orangtua) di atas —
-  //    pasangan bebas menggantung di bawahnya, tidak masuk baris istri lain.
-  // 2) Fallback: suami (L) di atas istri (P).
   const spouseSourceOf = (ps: Partnership): string => {
     const aRooted = parentsByChild.has(ps.partnerAId)
     const bRooted = parentsByChild.has(ps.partnerBId)
@@ -138,11 +129,6 @@ export function layoutFamily(
     return ps.partnerAId
   }
 
-  // Jangkar garis anak (dulu "ibu"):
-  // 1) orangtua ber-gender P;
-  // 2) bila dua orangtua berpasangan → target pernikahan (sisi istri),
-  //    konsisten tanpa peduli urutan klik saat menambahkan anak;
-  // 3) fallback: orangtua pertama.
   const anchorOf = (parents: string[]): string | undefined => {
     const valid = parents.filter((p) => byIndex.has(p))
     if (valid.length === 0) return undefined
@@ -162,37 +148,84 @@ export function layoutFamily(
     return valid[0]
   }
 
-  // ---------- Layout dagre langsung pada person ----------
-  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: 'TB', nodesep: NODE_GAP, ranksep: RANK_GAP })
-  for (const p of persons) g.setNode(p.id, { width: CARD_W, height: CARD_H })
+  // ---- Build parent→child tree from anchorOf ----
+  const childrenOf = new Map<string, string[]>()
+  const hasParent = new Set<string>()
+  for (const [childId, parents] of parentsByChild) {
+    const anchor = anchorOf(parents)
+    if (!anchor || anchor === childId || !byIndex.has(childId)) continue
+    const list = childrenOf.get(anchor) ?? []
+    list.push(childId)
+    childrenOf.set(anchor, list)
+    hasParent.add(childId)
+  }
 
+  // ---- Partnership wives as tree children of their husband ----
+  // For each partnership where the source (husband) is in the tree,
+  // add the target (wife) as a child so d3 positions her below him.
   const seenPair = new Set<string>()
+  const wifeChildrenOf = new Map<string, string[]>()
   for (const ps of partnerships) {
     const s = spouseSourceOf(ps)
     const t = s === ps.partnerAId ? ps.partnerBId : ps.partnerAId
     if (!byIndex.has(s) || !byIndex.has(t) || s === t) continue
-    const key = `${s}->${t}`
+    const key = [s, t].sort().join('->')
     if (seenPair.has(key)) continue
     seenPair.add(key)
-    g.setEdge(s, t)
-  }
-  for (const [childId, parents] of parentsByChild) {
-    const m = anchorOf(parents)
-    if (m && byIndex.has(childId) && m !== childId) g.setEdge(m, childId)
-  }
-  Dagre.layout(g)
 
-  // Posisi person (top-left)
-  const posById = new Map<string, { x: number; y: number }>()
+    // Only add wife as tree child if she's NOT already in the tree
+    // (not a parent in any parent-child link, and not a child of anyone)
+    if (!hasParent.has(t) && !parentsByChild.has(t)) {
+      const list = wifeChildrenOf.get(s) ?? []
+      list.push(t)
+      wifeChildrenOf.set(s, list)
+    }
+  }
+
+  // Merge wife children into childrenOf
+  for (const [sId, wives] of wifeChildrenOf) {
+    const list = childrenOf.get(sId) ?? []
+    list.push(...wives)
+    childrenOf.set(sId, list)
+  }
+
+  // ---- Forest: roots = nodes with no parent in tree ----
+  const treeIds = new Set([...childrenOf.keys(), ...hasParent])
+  const roots: string[] = []
+  for (const id of treeIds) {
+    if (!hasParent.has(id)) roots.push(id)
+  }
+  // Orphan nodes (no parent-child links at all)
   for (const p of persons) {
-    const n = g.node(p.id)
-    posById.set(p.id, { x: n.x - CARD_W / 2, y: n.y - CARD_H / 2 })
+    if (!treeIds.has(p.id)) roots.push(p.id)
   }
 
-  const { degree, rankByHub } = computeMarriageRanks(partnerships)
+  // ---- Build d3 hierarchy nodes ----
+  const build = (id: string): TreeNode => ({
+    id,
+    children: (childrenOf.get(id) ?? []).map(build),
+  })
 
-  // ---------- Nodes ----------
+  const forest: TreeNode = { id: '__root__', children: roots.map(build) }
+  const root = hierarchy(forest)
+
+  // ---- Run d3 tree layout ----
+  const nodeSize = [CARD_W + NODE_GAP, CARD_H + RANK_GAP] as [number, number]
+  const treeLayout = d3tree<TreeNode>().nodeSize(nodeSize)
+  const laid = treeLayout(root) as HierarchyPointNode<TreeNode>
+
+  // ---- Map positions (d3 center → top-left) ----
+  const posById = new Map<string, { x: number; y: number }>()
+  for (const n of laid.descendants()) {
+    if (n.data.id === '__root__') continue
+    posById.set(n.data.id, {
+      x: n.x - CARD_W / 2,
+      y: n.y - CARD_H / 2,
+    })
+  }
+
+  // ---- Nodes ----------
+  const { degree, rankByHub } = computeMarriageRanks(partnerships)
   const orders = computeBirthOrders(parentsByChild, byIndex)
   const nodes: PersonNode[] = persons.map((p) => {
     let spouseOrder: SpouseOrder | undefined
@@ -210,7 +243,7 @@ export function layoutFamily(
     return {
       id: p.id,
       type: 'person',
-      position: posById.get(p.id)!,
+      position: posById.get(p.id) ?? { x: 0, y: 0 },
       data: { person: p, birthOrder: orders.get(p.id), spouseOrder, onAction },
     }
   })
@@ -222,7 +255,6 @@ export function layoutFamily(
       ? { stroke: '#b0aca6', strokeWidth: 2, strokeDasharray: '6 4' }
       : { stroke: '#d66f9e', strokeWidth: 2 }
 
-  // Garis pernikahan: bezier dari bawah suami/berakar ke atas pasangannya
   for (const ps of partnerships) {
     const s = spouseSourceOf(ps)
     const t = s === ps.partnerAId ? ps.partnerBId : ps.partnerAId
@@ -238,7 +270,6 @@ export function layoutFamily(
     })
   }
 
-  // Garis anak: bezier dari bawah ibu ke atas anak
   for (const [childId, parents] of parentsByChild) {
     if (!byIndex.has(childId)) continue
     const anchor = anchorOf(parents)

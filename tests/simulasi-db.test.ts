@@ -30,7 +30,7 @@ async function main() {
     persons.map((p: any) => [p.id, p.fullName]),
   )
   const { layoutFamily } = await import('../src/components/family/layout.ts')
-  const { nodes, edges } = layoutFamily({ persons, parentLinks, partnerships })
+  const { nodes, edges } = await layoutFamily({ persons, parentLinks, partnerships })
 
   console.log('--- POSISI (baris per generasi) ---')
   const rows: Record<number, any[]> = {}
