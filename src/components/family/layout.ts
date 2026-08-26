@@ -1,4 +1,4 @@
-import { tree as d3tree, hierarchy, type HierarchyPointNode } from 'd3-hierarchy'
+import ELK from 'elkjs/lib/elk.bundled.js'
 import type { Edge, Node } from '@xyflow/react'
 
 import type { FamilyData } from '#/lib/family'
@@ -9,6 +9,8 @@ export const CARD_H = 96
 
 const RANK_GAP = 110
 const NODE_GAP = 56
+
+const elk = new ELK()
 
 export type NodeActionKind = 'view' | 'edit' | 'child' | 'partner' | 'parent'
 export type NodeActionHandler = (
@@ -98,8 +100,6 @@ export type PersonFlowData = {
 
 export type PersonNode = Node<PersonFlowData, 'person'>
 
-type TreeNode = { id: string; children: TreeNode[] }
-
 export async function layoutFamily(
   data: FamilyData,
   onAction?: PersonFlowData['onAction'],
@@ -148,80 +148,53 @@ export async function layoutFamily(
     return valid[0]
   }
 
-  // ---- Build parent→child tree from anchorOf ----
-  const childrenOf = new Map<string, string[]>()
-  const hasParent = new Set<string>()
-  for (const [childId, parents] of parentsByChild) {
-    const anchor = anchorOf(parents)
-    if (!anchor || anchor === childId || !byIndex.has(childId)) continue
-    const list = childrenOf.get(anchor) ?? []
-    list.push(childId)
-    childrenOf.set(anchor, list)
-    hasParent.add(childId)
+  // ---- Build ELK graph ----
+  const elkNodes: { id: string; width: number; height: number }[] = []
+  for (const p of persons) {
+    elkNodes.push({ id: p.id, width: CARD_W, height: CARD_H })
   }
 
-  // ---- Partnership wives as tree children of their husband ----
-  // For each partnership where the source (husband) is in the tree,
-  // add the target (wife) as a child so d3 positions her below him.
+  const elkEdges: { id: string; sources: string[]; targets: string[] }[] = []
+
   const seenPair = new Set<string>()
-  const wifeChildrenOf = new Map<string, string[]>()
   for (const ps of partnerships) {
     const s = spouseSourceOf(ps)
     const t = s === ps.partnerAId ? ps.partnerBId : ps.partnerAId
     if (!byIndex.has(s) || !byIndex.has(t) || s === t) continue
-    const key = [s, t].sort().join('->')
+    const key = `${s}->${t}`
     if (seenPair.has(key)) continue
     seenPair.add(key)
+    elkEdges.push({ id: `ps:${ps.id}`, sources: [s], targets: [t] })
+  }
 
-    // Only add wife as tree child if she's NOT already in the tree
-    // (not a parent in any parent-child link, and not a child of anyone)
-    if (!hasParent.has(t) && !parentsByChild.has(t)) {
-      const list = wifeChildrenOf.get(s) ?? []
-      list.push(t)
-      wifeChildrenOf.set(s, list)
+  for (const [childId, parents] of parentsByChild) {
+    const m = anchorOf(parents)
+    if (m && byIndex.has(childId) && m !== childId) {
+      elkEdges.push({ id: `pc:${childId}`, sources: [m], targets: [childId] })
     }
   }
 
-  // Merge wife children into childrenOf
-  for (const [sId, wives] of wifeChildrenOf) {
-    const list = childrenOf.get(sId) ?? []
-    list.push(...wives)
-    childrenOf.set(sId, list)
-  }
+  // ---- Layout with ELK ----
+  const result = await elk.layout(
+    {
+      id: 'root',
+      children: elkNodes,
+      edges: elkEdges,
+      layoutOptions: {
+        'elk.algorithm': 'layered',
+        'elk.direction': 'DOWN',
+        'elk.spacing.nodeNode': String(NODE_GAP),
+        'elk.layered.spacing.nodeNodeBetweenLayers': String(RANK_GAP),
+        'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+        'elk.layered.cycleBreaking.strategy': 'GREEDY',
+      },
+    },
+    { logging: false },
+  )
 
-  // ---- Forest: roots = nodes with no parent in tree ----
-  const treeIds = new Set([...childrenOf.keys(), ...hasParent])
-  const roots: string[] = []
-  for (const id of treeIds) {
-    if (!hasParent.has(id)) roots.push(id)
-  }
-  // Orphan nodes (no parent-child links at all)
-  for (const p of persons) {
-    if (!treeIds.has(p.id)) roots.push(p.id)
-  }
-
-  // ---- Build d3 hierarchy nodes ----
-  const build = (id: string): TreeNode => ({
-    id,
-    children: (childrenOf.get(id) ?? []).map(build),
-  })
-
-  const forest: TreeNode = { id: '__root__', children: roots.map(build) }
-  const root = hierarchy(forest)
-
-  // ---- Run d3 tree layout ----
-  const nodeSize = [CARD_W + NODE_GAP, CARD_H + RANK_GAP] as [number, number]
-  const treeLayout = d3tree<TreeNode>().nodeSize(nodeSize)
-  const laid = treeLayout(root) as HierarchyPointNode<TreeNode>
-
-  // ---- Map positions (d3 center → top-left) ----
   const posById = new Map<string, { x: number; y: number }>()
-  for (const n of laid.descendants()) {
-    if (n.data.id === '__root__') continue
-    posById.set(n.data.id, {
-      x: n.x - CARD_W / 2,
-      y: n.y - CARD_H / 2,
-    })
+  for (const child of result.children ?? []) {
+    posById.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 })
   }
 
   // ---- Nodes ----------
