@@ -74,11 +74,13 @@ function TabelPage() {
     const anak = data.parentLinks
       .filter((l) => l.parentId === anchor.id)
       .map((l) => ({ relasi: 'Anak', id: l.childId }))
-    return [...ortu, ...pasangan, ...anak].map((r) => ({
-      ...r,
-      nama: nama(r.id),
-      lahir: tahun(r.id),
-    }))
+    return [...ortu, ...pasangan, ...anak]
+      .map((r) => ({
+        ...r,
+        nama: nama(r.id),
+        lahir: tahun(r.id),
+      }))
+      .sort((a, b) => (a.lahir === '—' ? 1 : b.lahir === '—' ? -1 : a.lahir.localeCompare(b.lahir)))
   })()
 
   const spouseIdOf = (person: Person) => {
