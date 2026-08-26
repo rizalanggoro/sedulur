@@ -5,6 +5,7 @@ import { Baby, Eye, Heart, Search, Table2, ArrowUp } from 'lucide-react'
 
 import { getFamily } from '#/lib/family'
 import { Button } from '#/components/ui/button'
+import { Input } from '#/components/ui/input'
 import {
   PersonDialog,
   type PersonDialogState,
@@ -117,12 +118,12 @@ function TabelPage() {
               size={15}
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
-            <input
+            <Input
               id="cari-anchor"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="cth. Muh Sinun"
-              className="w-full rounded-full border border-border bg-background py-2.5 pl-9 pr-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+              className="pl-9"
             />
           </div>
           {results.length > 0 && (
